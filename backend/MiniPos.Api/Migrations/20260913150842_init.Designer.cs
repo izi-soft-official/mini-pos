@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MiniPos.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260913112316_InitialSchema")]
-    partial class InitialSchema
+    [Migration("20260913150842_init")]
+    partial class init
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

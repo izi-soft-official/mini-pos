@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using System.Threading;
 using MiniPos.Api.Data;
 
 LoadEnvFile();
@@ -62,11 +63,7 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    using (var scope = app.Services.CreateScope())
-    {
-        Seed.EnsureTestUser(scope.ServiceProvider.GetRequiredService<AppDbContext>());
-    }
-
+    // In Development show Swagger UI. Seeding/migrations are intentionally not performed automatically.
     app.UseSwagger();
     app.UseSwaggerUI();
 }
@@ -115,11 +112,15 @@ static void LoadEnvFile()
 
 static string BuildPostgresConnectionString(IConfiguration configuration)
 {
-    string Required(string key) => configuration[key]
-        ?? throw new InvalidOperationException(
-            $"{key} is not set. Copy .env.example to .env in the repo root.");
+    // Prefer configuration, then environment, then sensible defaults for development.
+    string Get(string key, string defaultValue)
+        => configuration[key] ?? Environment.GetEnvironmentVariable(key) ?? defaultValue;
 
-    return $"Host={Required("POSTGRES_HOST")};Port={Required("POSTGRES_PORT")};" +
-           $"Database={Required("POSTGRES_DB")};Username={Required("POSTGRES_USER")};" +
-           $"Password={Required("POSTGRES_PASSWORD")}";
+    var host = Get("POSTGRES_HOST", "localhost");
+    var port = Get("POSTGRES_PORT", "5432");
+    var database = Get("POSTGRES_DB", "minipos");
+    var user = Get("POSTGRES_USER", "postgres");
+    var password = Get("POSTGRES_PASSWORD", "postgres");
+
+    return $"Host={host};Port={port};Database={database};Username={user};Password={password}";
 }
