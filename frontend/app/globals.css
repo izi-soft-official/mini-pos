@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 :root {
   --border: #d9d9d9;
   --muted: #666666;
@@ -17,6 +19,7 @@ body {
 
 .nav {
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 16px;
   padding: 12px 24px;
@@ -70,4 +73,48 @@ body {
   max-width: 360px;
   min-height: 200px;
   padding: 16px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table th {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  color: #1a1a1a;
+}
+
+.table tbody tr:hover {
+  background: #fafafa;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* right-align numeric columns like price, qty, total */
+.table td.numeric,
+.table th.numeric {
+  text-align: right;
+}
+
+/* empty-state row, e.g. "No products match..." */
+.table td.empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 24px 12px;
 }
