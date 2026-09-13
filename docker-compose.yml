@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: minipos-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: minipos
+      POSTGRES_USER: minipos
+      POSTGRES_PASSWORD: minipos
+    ports:
+      - "5432:5432"
+    volumes:
+      - minipos-data:/var/lib/postgresql/data
+
+volumes:
+  minipos-data:
