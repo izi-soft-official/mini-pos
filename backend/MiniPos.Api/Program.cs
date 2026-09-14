@@ -1,10 +1,13 @@
 using System.Text;
+using System.Threading;
+using FluentValidation;
+using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
-using System.Threading;
 using MiniPos.Api.Data;
+using MiniPos.Api.Repositories;
 
 
 
@@ -35,6 +38,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
+builder.Services.AddScoped<IUserRepo, UserRepo>();
+
 builder.Services.AddAuthorization();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -64,6 +69,9 @@ builder.Services.AddCors(options =>
       .WithOrigins(allowedOrigins)
       .AllowAnyHeader()
       .AllowAnyMethod()));
+
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+builder.Services.AddFluentValidationAutoValidation();
 
 var app = builder.Build();
 
