@@ -36,6 +36,7 @@ export interface Sale {
   number: string;
   createdAt: string;
   customerId?: string;
+  cashierName?: string;
   lines: SaleLine[];
   subtotal: number;
   discount: number;
@@ -58,8 +59,8 @@ export const products: Product[] = [
 
 export const customers: Customer[] = [
   { id: "c1", name: "Walk-in Customer", createdAt: "2026-01-01T00:00:00.000Z" },
-  { id: "c2", name: "Maria Torres", email: "maria@example.com", phone: "555-0102", createdAt: "2026-02-14T09:30:00.000Z" },
-  { id: "c3", name: "Jonas Reyes", email: "jonas@example.com", phone: "555-0177", createdAt: "2026-03-02T15:00:00.000Z" },
+  { id: "c2", name: "Maria Torres", email: "maria@example.com", phone: "0555 01 02 03", createdAt: "2026-02-14T09:30:00.000Z" },
+  { id: "c3", name: "Jonas Reyes", email: "jonas@example.com", phone: "0555 01 77 78", createdAt: "2026-03-02T15:00:00.000Z" },
 ];
 
 export const sales: Sale[] = [
@@ -68,6 +69,7 @@ export const sales: Sale[] = [
     number: "S-1001",
     createdAt: "2026-08-10T14:22:00.000Z",
     customerId: "c2",
+    cashierName: "Alice Johnson",
     lines: [
       { productId: "p1", productName: "Book", quantity: 2, unitPrice: 5.0, lineTotal: 10.0 },
       { productId: "p5", productName: "USB Cable", quantity: 1, unitPrice: 7.99, lineTotal: 7.99 },
@@ -85,6 +87,7 @@ export const sales: Sale[] = [
     number: "S-1002",
     createdAt: "2026-08-11T10:05:00.000Z",
     customerId: "c1",
+    cashierName: "Alice Johnson",
     lines: [
       { productId: "p3", productName: "Desk Lamp", quantity: 1, unitPrice: 35.0, lineTotal: 35.0 },
     ],
@@ -101,7 +104,7 @@ export const sales: Sale[] = [
 // ---------- Product helpers ----------
 
 export function getProducts(): Product[] {
-  return products;
+  return [...products];
 }
 
 export function getProductById(id: string): Product | undefined {
