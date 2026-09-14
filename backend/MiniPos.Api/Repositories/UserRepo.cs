@@ -4,6 +4,7 @@ using MiniPos.Api.Dtos;
 using Isopoh.Cryptography.Argon2;
 using MiniPos.Api.Models;
 using static MiniPos.Api.Dtos.UsersDto;
+using MiniPos.Api.Interfaces;
 namespace MiniPos.Api.Repositories;
 
 public class UserRepo(AppDbContext db) : IUserRepo
@@ -40,6 +41,22 @@ public class UserRepo(AppDbContext db) : IUserRepo
             .AsNoTracking()
             .Select(u => new UserResponse(u.Id, u.Username, u.FullName, u.Role, u.IsActive))
             .ToListAsync();
+    }
+
+    public async Task<User?> GetEntityByUsernameAsync(string username)
+    {
+        return await _db.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Username == username);
+    }
+
+    public Task<UserResponse?> GetUserByIdAsync(Guid id)
+    {
+        return _db.Users
+            .AsNoTracking()
+            .Where(u => u.Id == id)
+            .Select(u => new UserResponse(u.Id, u.Username, u.FullName, u.Role, u.IsActive))
+            .FirstOrDefaultAsync();
     }
 
 

@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MiniPos.Api.Dtos;
-using MiniPos.Api.Repositories;
+using MiniPos.Api.Interfaces;
 using static MiniPos.Api.Dtos.UsersDto;
 
 namespace MiniPos.Api.Controllers;
@@ -73,7 +73,7 @@ public class UsersController(IUserRepo userRepo, ILogger<UsersController> logger
         return Ok(new { Message = "User Updated Successfully." });
     }
 
-    [HttpPut("{id}/password")]
+    [HttpPut("{id:guid}/password")]
     public async Task<ActionResult> ChangePassword(Guid id, [FromBody] ChangePasswordRequest request)
     {
         var updateSuccess = await _userRepo.ChangePassword(id, request);

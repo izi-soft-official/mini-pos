@@ -7,7 +7,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using MiniPos.Api.Data;
+using MiniPos.Api.Interfaces;
 using MiniPos.Api.Repositories;
+using MiniPos.Api.Services;
 
 
 
@@ -39,6 +41,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddScoped<IUserRepo, UserRepo>();
+builder.Services.AddScoped<IAuthRepo, AuthRepo>();
+builder.Services.AddTransient<ITokenService, TokenService>();
 
 builder.Services.AddAuthorization();
 builder.Services.AddControllers();

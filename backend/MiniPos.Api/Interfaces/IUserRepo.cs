@@ -1,8 +1,9 @@
 using Isopoh.Cryptography.Argon2;
+using Microsoft.EntityFrameworkCore;
 using MiniPos.Api.Models;
 using static MiniPos.Api.Dtos.UsersDto;
 
-namespace MiniPos.Api.Repositories
+namespace MiniPos.Api.Interfaces
 {
     public interface IUserRepo
     {
@@ -16,6 +17,11 @@ namespace MiniPos.Api.Repositories
         Task<bool> ChangePassword(Guid id, ChangePasswordRequest passdto);
 
         Task<bool> DeleteUser(Guid id);
+
+        Task<User?> GetEntityByUsernameAsync(string username);
+
+        Task<UserResponse?> GetUserByIdAsync(Guid id);
+
         string Hash(string password);
         public void VerifyHash(string password, string hash);
     }

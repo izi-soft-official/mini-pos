@@ -23,8 +23,8 @@ public class CreateUserRequestValidator : AbstractValidator<CreateUserRequest>
 
         RuleFor(x => x.Role)
             .NotEmpty().WithMessage("Role is required.")
-            .Must(role => role == "Admin" || role == "User")
-            .WithMessage("Role must be either 'Admin' or 'User'.");
+            .Must(role => role == "Admin" || role == "Manager" || role == "Cashier")
+            .WithMessage("Role must be either 'Admin', 'Manager', or 'Cashier'.");
     }
 }
 
@@ -38,8 +38,8 @@ public class UpdateUserRequestValidator : AbstractValidator<UpdateUserRequest>
 
         RuleFor(x => x.Role)
             .NotEmpty().WithMessage("Role is required.")
-            .Must(role => role == "Admin" || role == "User")
-            .WithMessage("Role must be either 'Admin' or 'User'.");
+            .Must(role => role == "Admin" || role == "Manager" || role == "Cashier")
+            .WithMessage("Role must be either 'Admin', 'Manager', or 'Cashier'.");
     }
 }
 
