@@ -1,31 +1,18 @@
 namespace MiniPos.Api.Dtos;
 
-public class UserResponse
+public class UsersDto
 {
-    public int Id { get; set; }
-    public string Username { get; set; } = string.Empty;
-    public string FullName { get; set; } = string.Empty;
-    public string Role { get; set; } = string.Empty;
-    public bool IsActive { get; set; }
-}
+    public record UserResponse(Guid Id, string Username, string FullName, string Role, bool IsActive);
+    public record CreateUserRequest
+    {
+        public string Username { get; set; } = string.Empty;
+        public string FullName { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public string Role { get; set; } = string.Empty;
+        public bool IsActive { get; set; }
+    }
 
-public class CreateUserRequest
-{
-    public string Username { get; set; } = string.Empty;
-    public string FullName { get; set; } = string.Empty;
-    public string Password { get; set; } = string.Empty;
-    public string Role { get; set; } = string.Empty;
-    public bool IsActive { get; set; }
-}
+    public record UpdateUserRequest(string FullName, string Role, bool IsActive);
 
-public class UpdateUserRequest
-{
-    public string FullName { get; set; } = string.Empty;
-    public string Role { get; set; } = string.Empty;
-    public bool IsActive { get; set; }
-}
-
-public class ChangePasswordRequest
-{
-    public string NewPassword { get; set; } = string.Empty;
+    public record ChangePasswordRequest(string OldPassword, string NewPassword);
 }

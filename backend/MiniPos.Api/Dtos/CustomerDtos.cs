@@ -1,6 +1,6 @@
 namespace MiniPos.Api.Dtos;
 
-public class CustomerResponse
+public record CustomerResponse
 {
     public int Id { get; set; }
     public string FullName { get; set; } = string.Empty;
@@ -10,7 +10,7 @@ public class CustomerResponse
     public DateTime CreatedAt { get; set; }
 }
 
-public class CreateCustomerRequest
+public record CreateCustomerRequest
 {
     public string FullName { get; set; } = string.Empty;
     public string Phone { get; set; } = string.Empty;
@@ -18,6 +18,6 @@ public class CreateCustomerRequest
     public string Note { get; set; } = string.Empty;
 }
 
-public class UpdateCustomerRequest : CreateCustomerRequest
+public record UpdateCustomerRequest : CreateCustomerRequest
 {
 }

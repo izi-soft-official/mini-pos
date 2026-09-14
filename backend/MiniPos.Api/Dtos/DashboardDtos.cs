@@ -1,6 +1,6 @@
 namespace MiniPos.Api.Dtos;
 
-public class DashboardSummaryResponse
+public record DashboardSummaryResponse
 {
     public int SalesCount { get; set; }
     public decimal SalesTotal { get; set; }
@@ -9,7 +9,7 @@ public class DashboardSummaryResponse
     public int LowStockCount { get; set; }
 }
 
-public class TopProductResponse
+public record TopProductResponse
 {
     public int ProductId { get; set; }
     public string Sku { get; set; } = string.Empty;
@@ -18,7 +18,7 @@ public class TopProductResponse
     public decimal Total { get; set; }
 }
 
-public class SalesByDayResponse
+public record SalesByDayResponse
 {
     public DateOnly Date { get; set; }
     public int SalesCount { get; set; }

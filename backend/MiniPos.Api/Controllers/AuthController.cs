@@ -2,22 +2,17 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MiniPos.Api.Data;
 using MiniPos.Api.Dtos;
+using static MiniPos.Api.Dtos.UsersDto;
 
 namespace MiniPos.Api.Controllers;
 
 [ApiController]
 [Authorize]
 [Route("api/auth")]
-public class AuthController : ControllerBase
+public class AuthController(AppDbContext db, IConfiguration configuration) : ControllerBase
 {
-    private readonly AppDbContext _db;
-    private readonly IConfiguration _configuration;
-
-    public AuthController(AppDbContext db, IConfiguration configuration)
-    {
-        _db = db;
-        _configuration = configuration;
-    }
+    private readonly AppDbContext _db = db;
+    private readonly IConfiguration _configuration = configuration;
 
     [HttpPost("login")]
     [AllowAnonymous]

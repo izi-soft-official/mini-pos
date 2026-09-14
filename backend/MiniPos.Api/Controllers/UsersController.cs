@@ -1,52 +1,93 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using MiniPos.Api.Data;
 using MiniPos.Api.Dtos;
+using MiniPos.Api.Repositories;
+using static MiniPos.Api.Dtos.UsersDto;
 
 namespace MiniPos.Api.Controllers;
 
 [ApiController]
 [Authorize(Roles = "Admin")]
 [Route("api/users")]
-public class UsersController : ControllerBase
+public class UsersController(IUserRepo userRepo, ILogger<UsersController> logger) : ControllerBase
 {
-    private readonly AppDbContext _db;
-
-    public UsersController(AppDbContext db)
-    {
-        _db = db;
-    }
+    private readonly IUserRepo _userRepo = userRepo;
+    private readonly ILogger<UsersController> _logger = logger;
 
     [HttpGet]
-    public ActionResult<PagedResponse<UserResponse>> GetUsers(
+    public async Task<ActionResult<IEnumerable<UserResponse>>> GetUsers(
         [FromQuery] string? search,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        throw new NotImplementedException();
+        _logger.LogInformation("Executing GetUsers request at {Time}", DateTime.UtcNow);
+        try
+        {
+            var users = await _userRepo.GetAllUsers();
+            _logger.LogInformation("Got the users Successfully");
+            return Ok(users);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed Trying to retrieve users");
+            return StatusCode(503, new { Message = "Error From The Database" });
+        }
     }
 
     [HttpPost]
-    public ActionResult<UserResponse> CreateUser(CreateUserRequest request)
+    public async Task<ActionResult<UserResponse>> CreateUser([FromBody] CreateUserRequest request)
     {
-        throw new NotImplementedException();
+        try
+        {
+            var user = await _userRepo.CreateUser(request);
+            return CreatedAtAction(nameof(GetUsers), new { id = user.Id }, user);
+
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Failed to create user due to validation error");
+            return BadRequest(new { ex.Message });
+        }
     }
 
-    [HttpPut("{id}")]
-    public ActionResult<UserResponse> UpdateUser(int id, UpdateUserRequest request)
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult> UpdateUser(Guid id, [FromBody] UpdateUserRequest request)
     {
-        throw new NotImplementedException();
+        var updateSuccess = await _userRepo.UpdateUser(id, request);
+        _logger.LogInformation("User updated successfully");
+        if (!updateSuccess)
+        {
+            return Conflict(new { Message = "Failed to update user. User may not exist or data is invalid." });
+        }
+        return Ok(new { Message = "User Updated Successfully." });
     }
 
     [HttpPut("{id}/password")]
-    public IActionResult ChangePassword(int id, ChangePasswordRequest request)
+    public async Task<ActionResult> ChangePassword(Guid id, [FromBody] ChangePasswordRequest request)
     {
-        throw new NotImplementedException();
+        var updateSuccess = await _userRepo.ChangePassword(id, request);
+        _logger.LogInformation("Password changed successfully");
+
+        if (!updateSuccess)
+        {
+            return BadRequest(new { Message = "Failed to update Password, Check the Current Password" });
+        }
+
+
+        return Ok(new { Message = "Password Changed Successfully." });
+
     }
 
-    [HttpDelete("{id}")]
-    public IActionResult DeleteUser(int id)
+    [HttpDelete("{id:guid}")]
+    public async Task<ActionResult> DeleteUser(Guid id)
     {
-        throw new NotImplementedException();
+        var RemovedUser = await _userRepo.DeleteUser(id);
+        _logger.LogInformation("User deleted successfully");
+
+        if (!RemovedUser)
+        {
+            return NotFound(new { Message = "Failed to delete user. User may not exist." });
+        }
+        return Ok(new { Message = "User deleted successfully." });
     }
 }

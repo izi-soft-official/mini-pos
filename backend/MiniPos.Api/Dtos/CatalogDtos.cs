@@ -1,24 +1,24 @@
 namespace MiniPos.Api.Dtos;
 
-public class CategoryResponse
+public record CategoryResponse
 {
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public bool IsActive { get; set; }
 }
 
-public class CreateCategoryRequest
+public record CreateCategoryRequest
 {
     public string Name { get; set; } = string.Empty;
 }
 
-public class UpdateCategoryRequest
+public record UpdateCategoryRequest
 {
     public string Name { get; set; } = string.Empty;
     public bool IsActive { get; set; }
 }
 
-public class ProductResponse
+public record ProductResponse
 {
     public int Id { get; set; }
     public string Sku { get; set; } = string.Empty;
@@ -31,7 +31,7 @@ public class ProductResponse
     public bool IsActive { get; set; }
 }
 
-public class CreateProductRequest
+public record CreateProductRequest
 {
     public string Sku { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
@@ -42,6 +42,6 @@ public class CreateProductRequest
     public bool IsActive { get; set; }
 }
 
-public class UpdateProductRequest : CreateProductRequest
+public record UpdateProductRequest : CreateProductRequest
 {
 }

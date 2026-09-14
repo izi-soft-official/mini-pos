@@ -1,6 +1,6 @@
 namespace MiniPos.Api.Dtos;
 
-public class SaleItemResponse
+public record SaleItemResponse
 {
     public int Id { get; set; }
     public int ProductId { get; set; }
@@ -12,7 +12,7 @@ public class SaleItemResponse
     public int ReturnedQuantity { get; set; }
 }
 
-public class SaleResponse
+public record SaleResponse
 {
     public int Id { get; set; }
     public string Number { get; set; } = string.Empty;
@@ -31,7 +31,7 @@ public class SaleResponse
     public string Status { get; set; } = string.Empty;
 }
 
-public class SaleListItemResponse
+public record SaleListItemResponse
 {
     public int Id { get; set; }
     public string Number { get; set; } = string.Empty;
@@ -43,7 +43,7 @@ public class SaleListItemResponse
     public string Status { get; set; } = string.Empty;
 }
 
-public class CreateSaleRequest
+public record CreateSaleRequest
 {
     public int? CustomerId { get; set; }
     public string PaymentMethod { get; set; } = string.Empty;
@@ -52,20 +52,20 @@ public class CreateSaleRequest
     public List<CreateSaleItemRequest> Items { get; set; } = new();
 }
 
-public class CreateSaleItemRequest
+public record CreateSaleItemRequest
 {
     public int ProductId { get; set; }
     public int Quantity { get; set; }
     public decimal UnitPrice { get; set; }
 }
 
-public class CreateReturnRequest
+public record CreateReturnRequest
 {
     public string Reason { get; set; } = string.Empty;
     public List<ReturnItemRequest> Items { get; set; } = new();
 }
 
-public class ReturnItemRequest
+public record ReturnItemRequest
 {
     public int SaleItemId { get; set; }
     public int Quantity { get; set; }
