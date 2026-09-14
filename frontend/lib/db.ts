@@ -1,6 +1,4 @@
-// lib/db.ts
 
-// ---------- Types ----------
 
 export interface Product {
   id: string;
@@ -127,7 +125,7 @@ export function adjustStock(productId: string, delta: number): void {
 // ---------- Customer helpers ----------
 
 export function getCustomers(): Customer[] {
-  return customers;
+  return [...customers];
 }
 
 export function getCustomerById(id: string): Customer | undefined {
@@ -144,10 +142,20 @@ export function addCustomer(data: Omit<Customer, "id" | "createdAt">): Customer 
   return customer;
 }
 
+export function updateCustomer(updated: Customer): void {
+  const index = customers.findIndex((c) => c.id === updated.id);
+  if (index !== -1) customers[index] = updated;
+}
+
+export function deleteCustomer(id: string): void {
+  const index = customers.findIndex((c) => c.id === id);
+  if (index !== -1) customers.splice(index, 1);
+}
+
 // ---------- Sales helpers ----------
 
 export function getSales(): Sale[] {
-  return sales;
+  return [...sales];
 }
 
 export function getSaleById(id: string): Sale | undefined {
