@@ -8,12 +8,17 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using MiniPos.Api.Data;
 using MiniPos.Api.Interfaces;
+using MiniPos.Api.Models;
 using MiniPos.Api.Repositories;
 using MiniPos.Api.Services;
 
 
 
 var builder = WebApplication.CreateBuilder(args);
+
+var jwtSettings = builder.Configuration.GetSection("JwtSettings");
+var secretKey = jwtSettings["Secret"] ?? throw new InvalidOperationException("JwtSettings:Secret is missing from configuration.");
+var key = Encoding.UTF8.GetBytes(secretKey);
 
 var defaultConn = builder.Configuration.GetConnectionString("DefaultConnection");
 if (string.IsNullOrWhiteSpace(defaultConn))
@@ -24,25 +29,31 @@ if (string.IsNullOrWhiteSpace(defaultConn))
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(defaultConn));
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
-        };
-    });
 
 builder.Services.AddScoped<IUserRepo, UserRepo>();
 builder.Services.AddScoped<IAuthRepo, AuthRepo>();
-builder.Services.AddTransient<ITokenService, TokenService>();
+builder.Services.AddScoped<ITokenService, TokenService>();
+
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidIssuer = jwtSettings["Issuer"],
+        ValidateAudience = true,
+        ValidAudience = jwtSettings["Audience"],
+        ValidateLifetime = true,
+        IssuerSigningKey = new SymmetricSecurityKey(key),
+        ValidateIssuerSigningKey = true
+    };
+});
+
 
 builder.Services.AddAuthorization();
 builder.Services.AddControllers();
@@ -89,5 +100,44 @@ app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+
+
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var db = services.GetRequiredService<AppDbContext>();
+
+        // Use Migrate() instead of EnsureCreated() when using migrations
+        db.Database.Migrate();
+
+        if (!db.Users.Any(u => u.Username == "admin"))
+        {
+            var user = new User
+            {
+                Id = Guid.NewGuid(),
+                Username = "admino",
+                FullName = "Testo",
+                Role = "Admin",
+                IsActive = true
+            };
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword("admino123");
+
+            db.Users.Add(user);
+            db.SaveChanges();
+
+            var logger = services.GetRequiredService<ILogger<Program>>();
+            logger.LogInformation("Default test user 'admin' seeded successfully.");
+        }
+    }
+    catch (Exception ex)
+    {
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "An error occurred while seeding the database.");
+    }
+}
+
 
 app.Run();
