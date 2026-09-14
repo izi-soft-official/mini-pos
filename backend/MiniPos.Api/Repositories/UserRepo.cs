@@ -10,6 +10,30 @@ public class UserRepo(AppDbContext db) : IUserRepo
 {
     private readonly AppDbContext _db = db;
 
+
+    public async Task<(IEnumerable<UserResponse> Users, int TotalCount)> GetPagedUsersAsync(string? search, int page, int pageSize)
+    {
+        var query = _db.Users.AsNoTracking().AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            query = query.Where(u =>
+                u.Username.Contains(search) ||
+                u.FullName.Contains(search)
+            );
+        }
+
+        int totalCount = await query.CountAsync();
+
+        var users = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(u => new UserResponse(u.Id, u.Username, u.FullName, u.Role, u.IsActive))
+            .ToListAsync();
+
+        return (users, totalCount);
+    }
+
     public async Task<IEnumerable<UserResponse>> GetAllUsers()
     {
         return await _db.Users
@@ -17,7 +41,6 @@ public class UserRepo(AppDbContext db) : IUserRepo
             .Select(u => new UserResponse(u.Id, u.Username, u.FullName, u.Role, u.IsActive))
             .ToListAsync();
     }
-
 
 
     public async Task<UserResponse> CreateUser(CreateUserRequest reqdto)
@@ -104,6 +127,20 @@ public class UserRepo(AppDbContext db) : IUserRepo
             return false;
             throw new InvalidOperationException("no User was Found.");
         }
+
+        if (user.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase))
+        {
+            // count total admins currently in the database
+            int adminCount = await _db.Users.CountAsync(u => u.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase));
+
+            if (adminCount <= 1)
+            {
+                return false;
+            }
+            throw new InvalidOperationException("Cannot delete the last admin user.");
+        }
+
+
         _db.Users.Remove(user);
         await _db.SaveChangesAsync();
         return true;

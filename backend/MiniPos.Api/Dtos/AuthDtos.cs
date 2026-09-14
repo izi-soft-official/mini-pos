@@ -1,3 +1,5 @@
+using static MiniPos.Api.Dtos.UsersDto;
+
 namespace MiniPos.Api.Dtos;
 
 public record LoginRequest
@@ -6,9 +8,4 @@ public record LoginRequest
     public string Password { get; set; } = string.Empty;
 }
 
-public record LoginResponse
-{
-    public string Token { get; set; } = string.Empty;
-    public DateTime ExpiresAt { get; set; }
-    public UsersDto.UserResponse User { get; set; } = new();
-}
+public record LoginResponse(string Token, DateTime ExpiredAt, UserResponse User);

@@ -6,6 +6,8 @@ namespace MiniPos.Api.Repositories
 {
     public interface IUserRepo
     {
+
+        Task<(IEnumerable<UserResponse> Users, int TotalCount)> GetPagedUsersAsync(string? search, int page, int pageSize);
         Task<IEnumerable<UserResponse>> GetAllUsers();
         Task<UserResponse> CreateUser(CreateUserRequest reqdto);
 

@@ -15,22 +15,33 @@ public class UsersController(IUserRepo userRepo, ILogger<UsersController> logger
     private readonly ILogger<UsersController> _logger = logger;
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<UserResponse>>> GetUsers(
-        [FromQuery] string? search,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20)
+    public async Task<ActionResult> GetUsers(
+    [FromQuery] string? search,
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = 20)
     {
-        _logger.LogInformation("Executing GetUsers request at {Time}", DateTime.UtcNow);
         try
         {
-            var users = await _userRepo.GetAllUsers();
-            _logger.LogInformation("Got the users Successfully");
-            return Ok(users);
+            page = page < 1 ? 1 : page;
+            pageSize = pageSize is < 1 or > 100 ? 20 : pageSize;
+
+            var (users, totalCount) = await _userRepo.GetPagedUsersAsync(search, page, pageSize);
+
+            _logger.LogInformation("Got the paged users successfully.");
+
+            return Ok(new
+            {
+                totalCount,
+                page,
+                pageSize,
+                totalPages = (int)Math.Ceiling(totalCount / (double)pageSize),
+                data = users
+            });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed Trying to retrieve users");
-            return StatusCode(503, new { Message = "Error From The Database" });
+            _logger.LogError(ex, "Failed trying to retrieve users.");
+            return StatusCode(503, new { message = "Error From The Database" });
         }
     }
 
