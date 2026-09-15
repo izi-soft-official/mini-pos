@@ -31,6 +31,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<IUserRepo, UserRepo>();
 builder.Services.AddScoped<IAuthRepo, AuthRepo>();
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IProductRepo, ProductRepo>();
 
 
 builder.Services.AddAuthentication(options =>
