@@ -64,7 +64,9 @@ if (app.Environment.IsDevelopment())
 {
     using (var scope = app.Services.CreateScope())
     {
-        Seed.EnsureTestUser(scope.ServiceProvider.GetRequiredService<AppDbContext>());
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Seed.EnsureTestUser(db);
+        Seed.EnsureDemoData(db);
     }
 
     app.UseSwagger();
