@@ -1,72 +1,31 @@
 namespace MiniPos.Api.Dtos;
 
-public record SaleItemResponse
-{
-    public int Id { get; set; }
-    public int ProductId { get; set; }
-    public string Sku { get; set; } = string.Empty;
-    public string ProductName { get; set; } = string.Empty;
-    public int Quantity { get; set; }
-    public decimal UnitPrice { get; set; }
-    public decimal LineTotal { get; set; }
-    public int ReturnedQuantity { get; set; }
-}
+public record SaleItemResponse(Guid Id, Guid ProductId, string Sku, string ProductName, int Quantity, decimal UnitPrice, decimal LineTotal, int ReturnedQuantity);
 
-public record SaleResponse
-{
-    public int Id { get; set; }
-    public string Number { get; set; } = string.Empty;
-    public DateTime CreatedAt { get; set; }
-    public int? CustomerId { get; set; }
-    public string? CustomerName { get; set; }
-    public string CashierName { get; set; } = string.Empty;
-    public List<SaleItemResponse> Items { get; set; } = new();
-    public decimal Subtotal { get; set; }
-    public decimal Discount { get; set; }
-    public decimal Total { get; set; }
-    public decimal PaidAmount { get; set; }
-    public decimal ChangeAmount { get; set; }
-    public decimal RefundedAmount { get; set; }
-    public string PaymentMethod { get; set; } = string.Empty;
-    public string Status { get; set; } = string.Empty;
-}
+public record SaleResponse(
+    Guid Id,
+    string Number,
+    DateTime CreatedAt,
+    Guid? CustomerId,
+    string? CustomerName,
+    string CashierName,
+    List<SaleItemResponse> Items,
+    decimal Subtotal,
+    decimal Discount,
+    decimal Total,
+    decimal PaidAmount,
+    decimal ChangeAmount,
+    decimal RefundedAmount,
+    string PaymentMethod,
+    string Status
+);
 
-public record SaleListItemResponse
-{
-    public int Id { get; set; }
-    public string Number { get; set; } = string.Empty;
-    public DateTime CreatedAt { get; set; }
-    public string? CustomerName { get; set; }
-    public int ItemCount { get; set; }
-    public decimal Total { get; set; }
-    public string PaymentMethod { get; set; } = string.Empty;
-    public string Status { get; set; } = string.Empty;
-}
+public record SaleListItemResponse(Guid Id, string Number, DateTime CreatedAt, string? CustomerName, int ItemCount, decimal Total, string PaymentMethod, string Status);
 
-public record CreateSaleRequest
-{
-    public int? CustomerId { get; set; }
-    public string PaymentMethod { get; set; } = string.Empty;
-    public decimal Discount { get; set; }
-    public decimal PaidAmount { get; set; }
-    public List<CreateSaleItemRequest> Items { get; set; } = new();
-}
+public record CreateSaleRequest(Guid? CustomerId, string PaymentMethod, decimal Discount, decimal PaidAmount, List<CreateSaleItemRequest> Items);
 
-public record CreateSaleItemRequest
-{
-    public int ProductId { get; set; }
-    public int Quantity { get; set; }
-    public decimal UnitPrice { get; set; }
-}
+public record CreateSaleItemRequest(Guid ProductId, int Quantity, decimal UnitPrice);
 
-public record CreateReturnRequest
-{
-    public string Reason { get; set; } = string.Empty;
-    public List<ReturnItemRequest> Items { get; set; } = new();
-}
+public record CreateReturnRequest(string Reason, List<ReturnItemRequest> Items);
 
-public record ReturnItemRequest
-{
-    public int SaleItemId { get; set; }
-    public int Quantity { get; set; }
-}
+public record ReturnItemRequest(Guid SaleItemId, int Quantity);

@@ -1,53 +1,64 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using MiniPos.Api.Data;
 using MiniPos.Api.Dtos;
+using MiniPos.Api.Interfaces;
 
 namespace MiniPos.Api.Controllers;
 
 [ApiController]
 [Authorize]
 [Route("api/customers")]
-public class CustomersController : ControllerBase
+public class CustomersController(ICustomerRepo repo, ILogger<CustomersController> logger) : ControllerBase
 {
-    private readonly AppDbContext _db;
-
-    public CustomersController(AppDbContext db)
-    {
-        _db = db;
-    }
+    private readonly ICustomerRepo _repo = repo;
+    private readonly ILogger<CustomersController> _logger = logger;
 
     [HttpGet]
-    public ActionResult<PagedResponse<CustomerResponse>> GetCustomers(
+    public async Task<ActionResult<PagedResponse<CustomerResponse>>> GetCustomers(
         [FromQuery] string? search,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        throw new NotImplementedException();
+        page = page < 1 ? 1 : page;
+        pageSize = pageSize is < 1 or > 100 ? 20 : pageSize;
+
+        var (items, total) = await _repo.GetPagedCustomersAsync(search, page, pageSize);
+        var resp = new PagedResponse<CustomerResponse> { Items = items.ToList(), Page = page, PageSize = pageSize, Total = total };
+        return Ok(resp);
     }
 
-    [HttpGet("{id}")]
-    public ActionResult<CustomerResponse> GetCustomer(int id)
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<CustomerResponse>> GetCustomer(Guid id)
     {
-        throw new NotImplementedException();
+        var customer = await _repo.GetByIdAsync(id);
+        if (customer == null) return NotFound(new { message = "Customer not found." });
+        return Ok(customer);
     }
 
     [HttpPost]
-    public ActionResult<CustomerResponse> CreateCustomer(CreateCustomerRequest request)
+    public async Task<ActionResult<CustomerResponse>> CreateCustomer(CreateCustomerRequest request)
     {
-        throw new NotImplementedException();
+        var created = await _repo.CreateCustomer(request);
+        _logger.LogInformation("Created customer {Name}", created.FullName);
+        return CreatedAtAction(nameof(GetCustomer), new { id = created.Id }, created);
     }
 
-    [HttpPut("{id}")]
-    public ActionResult<CustomerResponse> UpdateCustomer(int id, UpdateCustomerRequest request)
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult> UpdateCustomer(Guid id, UpdateCustomerRequest request)
     {
-        throw new NotImplementedException();
+        var ok = await _repo.UpdateCustomer(id, request);
+        if (!ok) return NotFound(new { message = "Customer not found." });
+        _logger.LogInformation("Updated customer {Id}", id);
+        return NoContent();
     }
 
-    [HttpDelete("{id}")]
+    [HttpDelete("{id:guid}")]
     [Authorize(Roles = "Admin,Manager")]
-    public IActionResult DeleteCustomer(int id)
+    public async Task<IActionResult> DeleteCustomer(Guid id)
     {
-        throw new NotImplementedException();
+        var ok = await _repo.DeleteCustomer(id);
+        if (!ok) return NotFound(new { message = "Customer not found." });
+        _logger.LogInformation("Deleted customer {Id}", id);
+        return NoContent();
     }
 }

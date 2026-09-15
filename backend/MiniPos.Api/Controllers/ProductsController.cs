@@ -1,7 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
-using MiniPos.Api.Data;
 using MiniPos.Api.Dtos;
 using MiniPos.Api.Interfaces;
 using MiniPos.Api.Models;
@@ -25,6 +23,11 @@ public class ProductsController(ILogger<ProductsController> logger, IProductRepo
         [FromQuery] int pageSize = 20)
     {
         var products = await _repo.GetAllAsync(search, categoryId, activeOnly, page, pageSize);
+        if (products.Count() < 1)
+        {
+            _logger.LogInformation("No products found for the given criteria");
+            return NotFound(new { message = "No products found." });
+        }
 
         var response = products.Select(p => new ProductResponse(
             p.Id,
@@ -49,7 +52,7 @@ public class ProductsController(ILogger<ProductsController> logger, IProductRepo
         var product = await _repo.GetByIdAsync(id);
         if (product == null)
         {
-            return NotFound();
+            return NotFound(new { message = "Product not found." });
         }
 
         var response = new ProductResponse(
@@ -76,7 +79,7 @@ public class ProductsController(ILogger<ProductsController> logger, IProductRepo
             Id = Guid.NewGuid(),
             Sku = request.Sku,
             Name = request.Name,
-            CategoryId = request.CategoryGuid,
+            CategoryId = request.CategoryId,
             Price = request.Price,
             Cost = request.Cost,
             Stock = request.Stock,
@@ -109,11 +112,11 @@ public class ProductsController(ILogger<ProductsController> logger, IProductRepo
     public async Task<IActionResult> Update(Guid id, UpdateProductRequest updateDto)
     {
         var product = await _repo.GetByIdAsync(id);
-        if (product == null) return NotFound();
+        if (product == null) return NotFound(new { message = "Product not found." });
 
         product.Sku = updateDto.Sku;
         product.Name = updateDto.Name;
-        product.CategoryId = updateDto.CategoryGuid;
+        product.CategoryId = updateDto.CategoryId;
         product.Price = updateDto.Price;
         product.Cost = updateDto.Cost;
         product.Stock = updateDto.Stock;
@@ -131,7 +134,7 @@ public class ProductsController(ILogger<ProductsController> logger, IProductRepo
     public async Task<IActionResult> Delete(Guid id)
     {
         var product = await _repo.GetByIdAsync(id);
-        if (product == null) return NotFound();
+        if (product == null) return NotFound(new { message = "Product not found." });
 
         await _repo.DeleteAsync(id);
         await _repo.SaveChangesAsync();

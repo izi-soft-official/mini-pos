@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using MiniPos.Api.Data;
 using MiniPos.Api.Dtos;
 using MiniPos.Api.Interfaces;
 using static MiniPos.Api.Dtos.UsersDto;

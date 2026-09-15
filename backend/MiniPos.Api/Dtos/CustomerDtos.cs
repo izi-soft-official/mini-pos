@@ -1,23 +1,7 @@
 namespace MiniPos.Api.Dtos;
 
-public record CustomerResponse
-{
-    public int Id { get; set; }
-    public string FullName { get; set; } = string.Empty;
-    public string Phone { get; set; } = string.Empty;
-    public string Email { get; set; } = string.Empty;
-    public string Note { get; set; } = string.Empty;
-    public DateTime CreatedAt { get; set; }
-}
+public record CustomerResponse(Guid Id, string FullName, string Phone, string Email, string Note, DateTime CreatedAt);
 
-public record CreateCustomerRequest
-{
-    public string FullName { get; set; } = string.Empty;
-    public string Phone { get; set; } = string.Empty;
-    public string Email { get; set; } = string.Empty;
-    public string Note { get; set; } = string.Empty;
-}
+public record CreateCustomerRequest(string FullName, string Phone, string Email, string Note);
 
-public record UpdateCustomerRequest : CreateCustomerRequest
-{
-}
+public record UpdateCustomerRequest(string FullName, string Phone, string Email, string Note) : CreateCustomerRequest(FullName, Phone, Email, Note);

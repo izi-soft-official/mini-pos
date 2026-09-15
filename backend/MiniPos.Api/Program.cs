@@ -32,6 +32,11 @@ builder.Services.AddScoped<IUserRepo, UserRepo>();
 builder.Services.AddScoped<IAuthRepo, AuthRepo>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IProductRepo, ProductRepo>();
+builder.Services.AddScoped<ICategoryRepo, CategoryRepo>();
+builder.Services.AddScoped<ICustomerRepo, CustomerRepo>();
+builder.Services.AddScoped<ISettingsRepo, SettingsRepo>();
+builder.Services.AddScoped<ISaleRepo, SaleRepo>();
+builder.Services.AddScoped<IDashboardRepo, DashboardRepo>();
 
 
 builder.Services.AddAuthentication(options =>
@@ -84,6 +89,8 @@ builder.Services.AddCors(options =>
       .AllowAnyHeader()
       .AllowAnyMethod()));
 
+builder.Services.AddCustomRateLimiter();
+
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 builder.Services.AddFluentValidationAutoValidation();
 
@@ -94,10 +101,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 app.MapControllers();
 
 

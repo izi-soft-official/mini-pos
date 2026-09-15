@@ -1,28 +1,16 @@
 namespace MiniPos.Api.Dtos;
 
-public record CategoryResponse
-{
-    public int Guid { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public bool IsActive { get; set; }
-}
+public record CategoryResponse(Guid Id, string Name, bool IsActive);
 
-public record CreateCategoryRequest
-{
-    public string Name { get; set; } = string.Empty;
-}
+public record CreateCategoryRequest(string Name);
 
-public record UpdateCategoryRequest
-{
-    public string Name { get; set; } = string.Empty;
-    public bool IsActive { get; set; }
-}
+public record UpdateCategoryRequest(string Name, bool IsActive);
 
 public record ProductResponse(
-    Guid Guid,
+    Guid Id,
     string Sku,
     string Name,
-    Guid CategoryGuid,
+    Guid CategoryId,
     string CategoryName,
     decimal Price,
     decimal Cost,
@@ -33,7 +21,7 @@ public record ProductResponse(
 public record CreateProductRequest(
     string Sku,
     string Name,
-    Guid CategoryGuid,
+    Guid CategoryId,
     decimal Price,
     decimal Cost,
     int Stock,
@@ -43,9 +31,9 @@ public record CreateProductRequest(
 public record UpdateProductRequest(
     string Sku,
     string Name,
-    Guid CategoryGuid,
+    Guid CategoryId,
     decimal Price,
     decimal Cost,
     int Stock,
     bool IsActive
-) : CreateProductRequest(Sku, Name, CategoryGuid, Price, Cost, Stock, IsActive);
+) : CreateProductRequest(Sku, Name, CategoryId, Price, Cost, Stock, IsActive);

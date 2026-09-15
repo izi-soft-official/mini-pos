@@ -1,46 +1,75 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using MiniPos.Api.Data;
 using MiniPos.Api.Dtos;
+using MiniPos.Api.Interfaces;
 
 namespace MiniPos.Api.Controllers;
 
 [ApiController]
 [Authorize]
 [Route("api/categories")]
-public class CategoriesController : ControllerBase
+public class CategoriesController(ICategoryRepo repo, ILogger<CategoriesController> logger) : ControllerBase
 {
-    private readonly AppDbContext _db;
-
-    public CategoriesController(AppDbContext db)
-    {
-        _db = db;
-    }
+    private readonly ICategoryRepo _repo = repo;
+    private readonly ILogger<CategoriesController> _logger = logger;
 
     [HttpGet]
-    public ActionResult<List<CategoryResponse>> GetCategories()
+    public async Task<ActionResult<List<CategoryResponse>>> GetCategories()
     {
-        throw new NotImplementedException();
+        var categories = await _repo.GetAllAsync();
+        var resp = categories.Select(c => new CategoryResponse(c.Id, c.Name, c.IsActive)).ToList();
+        return Ok(resp);
     }
 
     [HttpPost]
     [Authorize(Roles = "Admin,Manager")]
-    public ActionResult<CategoryResponse> CreateCategory(CreateCategoryRequest request)
+    public async Task<ActionResult<CategoryResponse>> CreateCategory(CreateCategoryRequest request)
     {
-        throw new NotImplementedException();
+        if (string.IsNullOrWhiteSpace(request.Name)) return BadRequest(new { Message = "Name is required" });
+
+        var existing = (await _repo.GetAllAsync()).Any(c => c.Name == request.Name);
+        if (existing)
+        {
+            return Conflict(new { Message = "Category with the same name already exists." });
+        }
+
+        var category = new MiniPos.Api.Models.Category { Id = Guid.NewGuid(), Name = request.Name, IsActive = true };
+        await _repo.AddAsync(category);
+        await _repo.SaveChangesAsync();
+
+        _logger.LogInformation("Created category {Name}", category.Name);
+
+        var response = new CategoryResponse(category.Id, category.Name, category.IsActive);
+        return CreatedAtAction(nameof(GetCategories), new { id = category.Id }, response);
     }
 
-    [HttpPut("{id}")]
+    [HttpPut("{id:guid}")]
     [Authorize(Roles = "Admin,Manager")]
-    public ActionResult<CategoryResponse> UpdateCategory(int id, UpdateCategoryRequest request)
+    public async Task<ActionResult> UpdateCategory(Guid id, UpdateCategoryRequest request)
     {
-        throw new NotImplementedException();
+        var category = await _repo.GetByIdAsync(id);
+        if (category == null) return NotFound(new { message = "Category not found." });
+
+        category.Name = request.Name;
+        category.IsActive = request.IsActive;
+        _repo.Update(category);
+        await _repo.SaveChangesAsync();
+
+        _logger.LogInformation("Updated category {Id}", id);
+        return NoContent();
     }
 
-    [HttpDelete("{id}")]
+    [HttpDelete("{id:guid}")]
     [Authorize(Roles = "Admin,Manager")]
-    public IActionResult DeleteCategory(int id)
+    public async Task<IActionResult> DeleteCategory(Guid id)
     {
-        throw new NotImplementedException();
+        var cat = await _repo.GetByIdAsync(id);
+        if (cat == null) return NotFound(new { message = "Category not found." });
+
+        await _repo.DeleteAsync(id);
+        await _repo.SaveChangesAsync();
+
+        _logger.LogInformation("Deleted category {Id}", id);
+        return NoContent();
     }
 }

@@ -1,10 +1,9 @@
+using Isopoh.Cryptography.Argon2;
 using Microsoft.EntityFrameworkCore;
 using MiniPos.Api.Data;
-using MiniPos.Api.Dtos;
-using Isopoh.Cryptography.Argon2;
+using MiniPos.Api.Interfaces;
 using MiniPos.Api.Models;
 using static MiniPos.Api.Dtos.UsersDto;
-using MiniPos.Api.Interfaces;
 namespace MiniPos.Api.Repositories;
 
 public class UserRepo(AppDbContext db) : IUserRepo

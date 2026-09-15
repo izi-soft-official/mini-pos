@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using MiniPos.Api.Data;
-using MiniPos.Api.Dtos;
 using MiniPos.Api.Interfaces;
 using MiniPos.Api.Models;
 

@@ -1,7 +1,6 @@
-using MiniPos.Api.Data;
+using Isopoh.Cryptography.Argon2;
 using MiniPos.Api.Dtos;
 using MiniPos.Api.Interfaces;
-using Isopoh.Cryptography.Argon2;
 
 namespace MiniPos.Api.Repositories;
 

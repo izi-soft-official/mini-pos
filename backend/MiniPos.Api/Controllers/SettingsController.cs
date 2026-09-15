@@ -1,32 +1,31 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using MiniPos.Api.Data;
 using MiniPos.Api.Dtos;
+using MiniPos.Api.Interfaces;
 
 namespace MiniPos.Api.Controllers;
 
 [ApiController]
 [Authorize]
 [Route("api/settings")]
-public class SettingsController : ControllerBase
+public class SettingsController(ISettingsRepo repo, ILogger<SettingsController> logger) : ControllerBase
 {
-    private readonly AppDbContext _db;
-
-    public SettingsController(AppDbContext db)
-    {
-        _db = db;
-    }
+    private readonly ISettingsRepo _repo = repo;
+    private readonly ILogger<SettingsController> _logger = logger;
 
     [HttpGet]
-    public ActionResult<SettingsResponse> GetSettings()
+    public async Task<ActionResult<SettingsResponse>> GetSettings()
     {
-        throw new NotImplementedException();
+        var s = await _repo.GetSettingsAsync();
+        return Ok(s);
     }
 
     [HttpPut]
     [Authorize(Roles = "Admin")]
-    public ActionResult<SettingsResponse> UpdateSettings(UpdateSettingsRequest request)
+    public async Task<ActionResult<SettingsResponse>> UpdateSettings(UpdateSettingsRequest request)
     {
-        throw new NotImplementedException();
+        var s = await _repo.UpdateSettingsAsync(request);
+        _logger.LogInformation("Updated settings");
+        return Ok(s);
     }
 }
