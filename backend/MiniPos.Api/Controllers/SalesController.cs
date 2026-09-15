@@ -198,7 +198,70 @@ public class SalesController : ControllerBase
     [Authorize(Roles = "Admin,Manager")]
     public ActionResult<SaleResponse> ReturnSale(int id, CreateReturnRequest request)
     {
-        throw new NotImplementedException();
+        if (request.Items.Count == 0)
+            return BadRequest(new { error = "Select at least one item to return." });
+
+        if (request.Items.Any(i => i.Quantity <= 0))
+            return BadRequest(new { error = "Every returned item needs a quantity of at least 1." });
+
+        using var transaction = _db.Database.BeginTransaction();
+
+        var sale = _db.Sales
+            .Include(s => s.Items)
+            .FirstOrDefault(s => s.Id == id);
+
+        if (sale is null)
+            return NotFound(new { error = "Sale not found." });
+
+        if (sale.Status == "returned")
+            return BadRequest(new { error = "This sale is already fully returned." });
+
+        foreach (var group in request.Items.GroupBy(i => i.SaleItemId))
+        {
+            var line = sale.Items.FirstOrDefault(i => i.Id == group.Key);
+            if (line is null)
+                return BadRequest(new { error = "One of the selected lines is not part of this sale." });
+
+            var wanted = group.Sum(i => i.Quantity);
+            if (wanted > line.Quantity - line.ReturnedQuantity)
+                return BadRequest(new { error = $"Cannot return {wanted} of this line. Only {line.Quantity - line.ReturnedQuantity} left to return." });
+        }
+
+        var productIds = request.Items
+            .Select(i => sale.Items.First(l => l.Id == i.SaleItemId).ProductId)
+            .Distinct()
+            .OrderBy(i => i)
+            .ToList();
+
+        var products = _db.Products
+            .FromSql($@"SELECT * FROM ""Products"" WHERE ""Id"" = ANY({productIds}) ORDER BY ""Id"" FOR UPDATE")
+            .ToList();
+
+        var refunded = 0m;
+
+        foreach (var item in request.Items)
+        {
+            var line = sale.Items.First(l => l.Id == item.SaleItemId);
+
+            line.ReturnedQuantity += item.Quantity;
+            refunded += item.Quantity * line.UnitPrice;
+            products.First(p => p.Id == line.ProductId).Stock += item.Quantity;
+        }
+
+        sale.RefundedAmount += refunded;
+        sale.Status = sale.Items.All(i => i.ReturnedQuantity >= i.Quantity) ? "returned" : "partiallyReturned";
+
+        _db.SaveChanges();
+        transaction.Commit();
+
+        var updated = _db.Sales
+            .Include(s => s.Customer)
+            .Include(s => s.User)
+            .Include(s => s.Items)
+                .ThenInclude(i => i.Product)
+            .First(s => s.Id == id);
+
+        return ToResponse(updated);
     }
 
     private string NextSaleNumber()
