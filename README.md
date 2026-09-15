@@ -9,14 +9,18 @@ Needs the .NET 10 SDK, Node 20 or later, and Docker.
 Database:
 
 ```
-docker compose up -d
+docker compose up -d\
+ensure the Postgres is Running in the same Port as in the Config/env using (docker ps)
+
 ```
 
 Backend, on http://localhost:5080 with Swagger at `/swagger`:
 
 ```
 cd backend/MiniPos.Api
-dotnet run
+
+
+run the Backend in http mode or normal (dotnet run) avoid using dockerfile for now as it will lose connection to the containerized DB
 ```
 
 Frontend, on http://localhost:3000:
