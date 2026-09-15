@@ -10,7 +10,7 @@ namespace MiniPos.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/auth")]
-public class AuthController(IUserRepo userRepo, ILogger logger, IAuthRepo authRepo) : ControllerBase
+public class AuthController(IUserRepo userRepo, ILogger<AuthController> logger, IAuthRepo authRepo) : ControllerBase
 {
 
     private readonly IUserRepo _userRepo = userRepo;
@@ -24,6 +24,7 @@ public class AuthController(IUserRepo userRepo, ILogger logger, IAuthRepo authRe
         try
         {
             var result = await _authRepo.LoginAsync(request);
+            _logger.LogInformation("Users Logged in Successfully.");
             if (result == null)
             {
                 return Unauthorized(new { message = "Invalid username or password." });

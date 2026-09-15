@@ -1,7 +1,7 @@
 using MiniPos.Api.Data;
 using MiniPos.Api.Dtos;
 using MiniPos.Api.Interfaces;
-using BCrypt.Net;
+using Isopoh.Cryptography.Argon2;
 
 namespace MiniPos.Api.Repositories;
 
@@ -12,7 +12,7 @@ public class AuthRepo(IUserRepo userRepo, ITokenService tokenService) : IAuthRep
     public async Task<LoginResponse?> LoginAsync(LoginRequest request)
     {
         var user = await _userRepo.GetEntityByUsernameAsync(request.Username);
-        if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+        if (user == null || !Argon2.Verify(user.PasswordHash, request.Password))
         {
             return null;
         }

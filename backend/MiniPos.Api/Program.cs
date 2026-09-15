@@ -1,5 +1,4 @@
 using System.Text;
-using System.Threading;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -8,7 +7,6 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using MiniPos.Api.Data;
 using MiniPos.Api.Interfaces;
-using MiniPos.Api.Models;
 using MiniPos.Api.Repositories;
 using MiniPos.Api.Services;
 
@@ -102,42 +100,6 @@ app.UseAuthorization();
 app.MapControllers();
 
 
-using (var scope = app.Services.CreateScope())
-{
-    var services = scope.ServiceProvider;
-    try
-    {
-        var db = services.GetRequiredService<AppDbContext>();
-
-        // Use Migrate() instead of EnsureCreated() when using migrations
-        db.Database.Migrate();
-
-        if (!db.Users.Any(u => u.Username == "admin"))
-        {
-            var user = new User
-            {
-                Id = Guid.NewGuid(),
-                Username = "admino",
-                FullName = "Testo",
-                Role = "Admin",
-                IsActive = true
-            };
-
-            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword("admino123");
-
-            db.Users.Add(user);
-            db.SaveChanges();
-
-            var logger = services.GetRequiredService<ILogger<Program>>();
-            logger.LogInformation("Default test user 'admin' seeded successfully.");
-        }
-    }
-    catch (Exception ex)
-    {
-        var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred while seeding the database.");
-    }
-}
-
+await SeedData.SeedAsync(app.Services);
 
 app.Run();
