@@ -26,7 +26,8 @@ namespace MiniPos.Api.Repositories
 
             if (!string.IsNullOrWhiteSpace(search))
             {
-                query = query.Where(p => p.Name.Contains(search) || p.Sku.Contains(search));
+                var pattern = $"%{search}%";
+                query = query.Where(p => EF.Functions.ILike(p.Name, pattern) || EF.Functions.ILike(p.Sku, pattern));
             }
 
             var skip = (page - 1) * pageSize;
