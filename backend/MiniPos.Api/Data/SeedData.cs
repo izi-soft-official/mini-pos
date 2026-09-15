@@ -17,40 +17,45 @@ public static class SeedData
             await db.Database.MigrateAsync();
 
             var exists = await db.Users.AnyAsync(u => u.Username == "izitest");
+            var settingsExists = await db.Settings.AnyAsync();
+
             if (!exists)
             {
-                var userRepo = sp.GetRequiredService<IUserRepo>();
-                var passwordHash = userRepo.Hash("izitest");
-
-                // Use raw SQL insert without specifying Id so DB assigns identity/default
-                var conn = db.Database.GetDbConnection();
-                await conn.OpenAsync();
                 try
                 {
-                    using var insert = conn.CreateCommand();
-                    insert.CommandText = "INSERT INTO \"Users\" (\"Username\",\"PasswordHash\",\"FullName\",\"Role\",\"IsActive\") VALUES (@u,@p,@f,@r,@a)";
-                    var p1 = insert.CreateParameter(); p1.ParameterName = "@u"; p1.Value = "izitest"; insert.Parameters.Add(p1);
-                    var p2 = insert.CreateParameter(); p2.ParameterName = "@p"; p2.Value = passwordHash; insert.Parameters.Add(p2);
-                    var p3 = insert.CreateParameter(); p3.ParameterName = "@f"; p3.Value = "izitest"; insert.Parameters.Add(p3);
-                    var p4 = insert.CreateParameter(); p4.ParameterName = "@r"; p4.Value = "Admin"; insert.Parameters.Add(p4);
-                    var p5 = insert.CreateParameter(); p5.ParameterName = "@a"; p5.Value = true; insert.Parameters.Add(p5);
-                    await insert.ExecuteNonQueryAsync();
-                    logger.LogInformation("Seeded default user 'izitest' via direct insert.");
+                    var userRepo = sp.GetRequiredService<IUserRepo>();
+                    var createReq = new MiniPos.Api.Dtos.UsersDto.CreateUserRequest
+                    {
+                        Username = "izitest",
+                        FullName = "izitest",
+                        Password = "izitest",
+                        Role = "Admin",
+                        IsActive = true
+                    };
+
+                    await userRepo.CreateUser(createReq);
+                    logger.LogInformation("Seeded default user 'izitest'.");
                 }
-                finally
+                catch (Exception ex)
                 {
-                    await conn.CloseAsync();
+                    logger.LogWarning(ex, "Failed to seed default user via repository; trying direct insert.");
+                    var passwordHash = sp.GetRequiredService<IUserRepo>().Hash("izitest");
+                    db.Users.Add(new Models.User { Username = "izitest", PasswordHash = passwordHash, FullName = "izitest", Role = "Admin", IsActive = true });
+                    await db.SaveChangesAsync();
+                    logger.LogInformation("Seeded default user 'izitest' via direct insert fallback.");
                 }
             }
-            else
+
+            if (!settingsExists)
             {
-                logger.LogInformation("Default user 'izitest' already exists.");
+                db.Settings.Add(new Models.Setting { Id = Guid.NewGuid(), Language = "en", Theme = "light", LowStockThreshold = 5 });
+                await db.SaveChangesAsync();
+                logger.LogInformation("Seeded default settings.");
             }
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error occured while seeding default user.");
-            // do not rethrow to avoid blocking startup
+            logger.LogError(ex, "Error occured while seeding default user and settings");
         }
     }
 }
