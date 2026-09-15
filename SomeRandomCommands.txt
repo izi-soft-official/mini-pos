@@ -1,0 +1,2 @@
+## run sql commands on docker directly from the terminal (\q to exit):
+docker compose exec postgres psql -U minipos -d minipos
