@@ -1,73 +1,23 @@
-:root {
-  --border: #d9d9d9;
-  --muted: #666666;
-  --accent: #12508a;
-}
+@import "tailwindcss";
 
-* {
-  box-sizing: border-box;
+@theme {
+  --color-ink: #0d1520;
+  --color-surface: #16202e;
+  --color-surface-2: #1e2a3a;
+  --color-line: #2a3648;
+  --color-mint: #2ee6a8;
+  --color-mint-soft: #114a3a;
+  --color-muted: #8fa0b5;
 }
 
 body {
-  margin: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
-  color: #1a1a1a;
-  background: #f6f6f6;
-}
-
-.nav {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 12px 24px;
-  background: #ffffff;
-  border-bottom: 1px solid var(--border);
-}
-
-.nav-brand {
-  font-weight: 600;
-  margin-right: 8px;
-}
-
-.nav-link {
-  color: var(--muted);
-  text-decoration: none;
-  font-size: 14px;
-}
-
-.nav-link:hover {
-  color: var(--accent);
-}
-
-.nav-link-active {
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.page {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 24px;
-}
-
-.page h1 {
-  font-size: 22px;
-  margin: 0 0 16px;
+  background: var(--color-ink);
+  color: #eef2f7;
 }
 
 .panel {
-  background: #ffffff;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  min-height: 240px;
-  padding: 16px;
-}
-
-.form {
-  background: #ffffff;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  max-width: 360px;
-  min-height: 200px;
-  padding: 16px;
+  min-height: 12rem;
+  border: 1px solid var(--color-line);
+  border-radius: 0.75rem;
+  background: var(--color-surface);
 }

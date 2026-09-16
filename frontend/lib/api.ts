@@ -1,3 +1,28 @@
+export type Paged<T> = {
+  items: T[];
+  page: number;
+  pageSize: number;
+  total: number;
+};
+
+export type CategoryResponse = {
+  id: number;
+  name: string;
+  isActive: boolean;
+};
+
+export type ProductResponse = {
+  id: number;
+  sku: string;
+  name: string;
+  categoryId: number;
+  categoryName: string;
+  price: number;
+  cost: number;
+  stock: number;
+  isActive: boolean;
+};
+
 const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5080";
 
 const tokenKey = "minipos.token";
@@ -7,7 +32,7 @@ export function getToken(): string | null {
   return window.localStorage.getItem(tokenKey);
 }
 
-export function setToken(token: string) {
+export function setToken(token: string) { 
   window.localStorage.setItem(tokenKey, token);
 }
 
