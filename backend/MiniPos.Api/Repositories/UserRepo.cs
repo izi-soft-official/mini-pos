@@ -17,10 +17,8 @@ public class UserRepo(AppDbContext db) : IUserRepo
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            query = query.Where(u =>
-                u.Username.Contains(search) ||
-                u.FullName.Contains(search)
-            );
+            var patt = $"%{search}%";
+            query = query.Where(u => EF.Functions.ILike(u.Username, patt) || EF.Functions.ILike(u.FullName, patt));
         }
 
         int totalCount = await query.CountAsync();

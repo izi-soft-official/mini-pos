@@ -17,22 +17,6 @@ services:
       timeout: 5s
       retries: 10
 
-  api:
-    build:
-      context: ./backend/MiniPos.Api
-      dockerfile: Dockerfile
-    image: miniposapi:dev
-    ports:
-      - "${API_PORT:-8080}:8080"
-    environment:
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: "${POSTGRES_PORT:-5432}"
-      POSTGRES_DB: "${POSTGRES_DB:-minipos}"
-      POSTGRES_USER: "${POSTGRES_USER:-postgres}"
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-postgres}"
-      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres};Database=${POSTGRES_DB:-minipos}"
-    depends_on:
-      - postgres
 
 volumes:
   minipos-data:

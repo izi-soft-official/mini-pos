@@ -40,7 +40,11 @@ public class CustomerRepo(AppDbContext Db) : ICustomerRepo
     public async Task<(IEnumerable<CustomerResponse> Items, int Total)> GetPagedCustomersAsync(string? search, int page, int pageSize)
     {
         var query = _db.Customers.AsNoTracking().AsQueryable();
-        if (!string.IsNullOrWhiteSpace(search)) query = query.Where(c => c.FullName.Contains(search));
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var pattern = $"%{search}%";
+            query = query.Where(c => EF.Functions.Like(c.FullName, pattern) || EF.Functions.Like(c.Phone, pattern) || EF.Functions.Like(c.Email, pattern));
+        }
 
         var total = await query.CountAsync();
 
