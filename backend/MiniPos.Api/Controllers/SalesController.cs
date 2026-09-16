@@ -276,7 +276,7 @@ public class SalesController : ControllerBase
 
         var next = last is null ? 1 : int.Parse(last[prefix.Length..]) + 1;
 
-        return prefix + next.ToString("D0000");
+        return prefix + next.ToString("D4");
     }
 
     private static SaleResponse ToResponse(Sale sale) => new()
