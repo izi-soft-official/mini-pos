@@ -36,19 +36,30 @@ Put `NEXT_PUBLIC_API_URL=http://localhost:5080` in `frontend/.env.local`.
 
 ## Works now
 
-auth, categories, products, customers, sales, returns, health.
+everything in API.md: auth, categories, products, customers, sales, returns, settings, users,
+dashboard, health. AI stuff is phase 2.
 
-## Throws 500, don't call
+## Settings
 
-`/api/settings`, `/api/users`, `/api/dashboard/*`. Hardcode `en` and `light` instead of
-reading settings.
+`GET /api/settings` works for any logged in user. read language and theme from it at startup,
+drop the hardcoded `en`/`light`. only admin can `PUT`.
+
+## Users and dashboard
+
+- `/api/users` is admin only, others get 403.
+- can't delete or demote the last active admin, 400. can't delete a user with sales either,
+  deactivate them.
+- `/api/dashboard/*` is admin + manager.
+- no `from`/`to` means today. days are UTC, not Algeria time.
+- `sales-by-day` returns every day in the range, empty days come back with 0.
+- dashboard numbers are after returns.
 
 ## Gotchas
 
 - CORS errors: check `Cors:AllowedOrigins` in `appsettings.json` has `http://localhost:3000`.
 - Empty 401: the header is malformed. `Bearer <token>`, one space, no quotes.
 - `pageSize` caps at 100.
-- Sale errors come back as `{ "error": "..." }` with a message you can show the cashier.
+- Errors come back as `{ "error": "..." }` with a message you can show the user.
 - No tax anywhere. Money is decimal, 3 places.
 
 SQL: `docker compose exec postgres psql -U minipos -d minipos`, then type at the prompt. Exit
