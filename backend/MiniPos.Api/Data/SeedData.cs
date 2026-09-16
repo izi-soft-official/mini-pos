@@ -39,7 +39,7 @@ public static class SeedData
                 catch (Exception ex)
                 {
                     logger.LogWarning(ex, "Failed to seed default user via repository; trying direct insert.");
-                    var passwordHash = sp.GetRequiredService<IUserRepo>().Hash("izitest");
+                    var passwordHash = sp.GetRequiredService<IHashingService>().Hash("izitest");
                     db.Users.Add(new Models.User { Username = "izitest", PasswordHash = passwordHash, FullName = "izitest", Role = "Admin", IsActive = true });
                     await db.SaveChangesAsync();
                     logger.LogInformation("Seeded default user 'izitest' via direct insert fallback.");

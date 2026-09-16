@@ -6,9 +6,10 @@ using MiniPos.Api.Models;
 using static MiniPos.Api.Dtos.UsersDto;
 namespace MiniPos.Api.Repositories;
 
-public class UserRepo(AppDbContext db) : IUserRepo
+public class UserRepo(AppDbContext db, IHashingService hashingService) : IUserRepo
 {
     private readonly AppDbContext _db = db;
+    private readonly IHashingService _hashingService = hashingService;
 
 
     public async Task<(IEnumerable<UserResponse> Users, int TotalCount)> GetPagedUsersAsync(string? search, int page, int pageSize)
@@ -70,7 +71,7 @@ public class UserRepo(AppDbContext db) : IUserRepo
         {
             Username = reqdto.Username,
             FullName = reqdto.FullName,
-            PasswordHash = Hash(reqdto.Password),
+            PasswordHash = _hashingService.Hash(reqdto.Password),
             Role = reqdto.Role,
             IsActive = reqdto.IsActive
         };
@@ -120,13 +121,13 @@ public class UserRepo(AppDbContext db) : IUserRepo
             return false;
             throw new InvalidOperationException("no User was Found.");
         }
-        if (!Argon2.Verify(user.PasswordHash, passdto.OldPassword))
+        if (!_hashingService.VerifyHash(user.PasswordHash, passdto.OldPassword))
         {
             return false;
             throw new InvalidOperationException("Old password is incorrect.");
         }
 
-        user.PasswordHash = Hash(passdto.NewPassword);
+        user.PasswordHash = _hashingService.Hash(passdto.NewPassword);
 
         await _db.SaveChangesAsync();
         return true;
@@ -161,13 +162,4 @@ public class UserRepo(AppDbContext db) : IUserRepo
     }
 
 
-    public string Hash(string password)
-    {
-        return Argon2.Hash(password);
-    }
-
-    public void VerifyHash(string password, string hash)
-    {
-        Argon2.Verify(password, hash);
-    }
 }

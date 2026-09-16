@@ -37,6 +37,7 @@ builder.Services.AddScoped<ICustomerRepo, CustomerRepo>();
 builder.Services.AddScoped<ISettingsRepo, SettingsRepo>();
 builder.Services.AddScoped<ISaleRepo, SaleRepo>();
 builder.Services.AddScoped<IDashboardRepo, DashboardRepo>();
+builder.Services.AddSingleton<IHashingService, HashingService>();
 
 
 builder.Services.AddAuthentication(options =>

@@ -22,7 +22,5 @@ namespace MiniPos.Api.Interfaces
 
         Task<UserResponse?> GetUserByIdAsync(Guid id);
 
-        string Hash(string password);
-        public void VerifyHash(string password, string hash);
     }
 }

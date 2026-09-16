@@ -1,17 +1,17 @@
-using Isopoh.Cryptography.Argon2;
 using MiniPos.Api.Dtos;
 using MiniPos.Api.Interfaces;
 
 namespace MiniPos.Api.Repositories;
 
-public class AuthRepo(IUserRepo userRepo, ITokenService tokenService) : IAuthRepo
+public class AuthRepo(IUserRepo userRepo, ITokenService tokenService,IHashingService hashingService) : IAuthRepo
 {
     private readonly ITokenService _tokenService = tokenService;
     private readonly IUserRepo _userRepo = userRepo;
+    private readonly IHashingService _hashingService = hashingService;
     public async Task<LoginResponse?> LoginAsync(LoginRequest request)
     {
         var user = await _userRepo.GetEntityByUsernameAsync(request.Username);
-        if (user == null || !Argon2.Verify(user.PasswordHash, request.Password))
+        if (user == null || !_hashingService.VerifyHash(user.PasswordHash, request.Password))
         {
             return null;
         }
