@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using MiniPos.Api.Dtos;
 using MiniPos.Api.Interfaces;
 using static MiniPos.Api.Dtos.UsersDto;
@@ -8,6 +9,7 @@ namespace MiniPos.Api.Controllers;
 
 [ApiController]
 [Authorize]
+[EnableRateLimiting("strict-user-limit")]
 [Route("api/auth")]
 public class AuthController(IUserRepo userRepo, ILogger<AuthController> logger, IAuthRepo authRepo) : ControllerBase
 {
@@ -37,7 +39,6 @@ public class AuthController(IUserRepo userRepo, ILogger<AuthController> logger, 
         }
     }
 
-    [Authorize]
     [HttpGet("me")]
     public async Task<ActionResult<UserResponse>> GetCurrentUserInfo()
     {
