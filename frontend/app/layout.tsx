@@ -1,18 +1,23 @@
-import type { Metadata } from "next";
-import Nav from "@/components/Nav";
 import "./globals.css";
+import { Providers } from "@/components/Providers";
+import AppShell from "@/components/AppShell";
 
-export const metadata: Metadata = {
-  title: "mini-pos",
-  description: "Training POS for IZI Soft"
+export const metadata = {
+  title: "Mini POS",
+  description: "Point of sale management",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en">
       <body>
-        <Nav />
-        <main className="page">{children}</main>
+        <Providers>
+          <AppShell>{children}</AppShell>
+        </Providers>
       </body>
     </html>
   );

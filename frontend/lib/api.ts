@@ -1,52 +1,225 @@
-const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5080";
+import type {
+  Category,
+  Customer,
+  DashboardSummary,
+  PagedResponse,
+  Product,
+  Sale,
+  SaleListItem,
+  SalesByDay,
+  Settings,
+  TopProduct,
+  User,
+} from "./types";
 
-const tokenKey = "minipos.token";
+const API_URL = (
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5080/api"
+).replace(/\/$/, "");
 
-export function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(tokenKey);
+export function getToken() {
+  return typeof window === "undefined"
+    ? null
+    : localStorage.getItem("mini-pos-token");
 }
 
-export function setToken(token: string) {
-  window.localStorage.setItem(tokenKey, token);
-}
-
-export function clearToken() {
-  window.localStorage.removeItem(tokenKey);
-}
-
-function errorMessage(body: string): string {
-  try {
-    return (JSON.parse(body) as { error?: string }).error ?? body;
-  } catch {
-    return body;
+export function clearAuth() {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("mini-pos-token");
+    localStorage.removeItem("mini-pos-user");
   }
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const headers: Record<string, string> = {};
-  if (body !== undefined) headers["Content-Type"] = "application/json";
-
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-
-  const response = await fetch(`${baseUrl}${path}`, {
-    method,
+  const headers = new Headers(options.headers);
+  if (options.body && !headers.has("Content-Type"))
+    headers.set("Content-Type", "application/json");
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const r = await fetch(`${API_URL}${path}`, {
+    ...options,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body)
+    cache: "no-store",
   });
-
-  if (!response.ok) {
-    throw new Error(errorMessage(await response.text()) || response.statusText);
+  if (r.status === 401) {
+    clearAuth();
+    if (
+      typeof window !== "undefined" &&
+      !location.pathname.startsWith("/login")
+    )
+      location.href = "/login";
   }
-
-  if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
+  if (!r.ok) {
+    let msg = `Request failed (${r.status})`;
+    try {
+      const d = await r.json();
+      msg = d.error || d.title || msg;
+    } catch {}
+    throw new Error(msg);
+  }
+  if (r.status === 204) return undefined as T;
+  return r.json();
 }
 
-export const api = {
-  get: <T>(path: string) => request<T>("GET", path),
-  post: <T>(path: string, body?: unknown) => request<T>("POST", path, body),
-  put: <T>(path: string, body?: unknown) => request<T>("PUT", path, body),
-  delete: <T>(path: string) => request<T>("DELETE", path)
+export const auth = {
+  login: (username: string, password: string) =>
+    request<{ token: string; expiresAt: string; user: User }>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+    }),
+  me: () => request<User>("/auth/me"),
+};
+
+export const categories = {
+  list: () => request<Category[]>("/categories"),
+  create: (name: string) =>
+    request<Category>("/categories", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+  update: (id: number, data: { name: string; isActive: boolean }) =>
+    request<Category>(`/categories/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  remove: (id: number) =>
+    request<void>(`/categories/${id}`, { method: "DELETE" }),
+};
+
+export const products = {
+  list: (p?: {
+    search?: string;
+    categoryId?: number;
+    activeOnly?: boolean;
+    page?: number;
+    pageSize?: number;
+  }) => {
+    const q = new URLSearchParams();
+    if (p?.search) q.set("search", p.search);
+    if (p?.categoryId) q.set("categoryId", String(p.categoryId));
+    if (p?.activeOnly !== undefined) q.set("activeOnly", String(p.activeOnly));
+    q.set("page", String(p?.page ?? 1));
+    q.set("pageSize", String(p?.pageSize ?? 100));
+    return request<PagedResponse<Product>>(`/products?${q}`);
+  },
+  get: (id: number) => request<Product>(`/products/${id}`),
+  create: (data: Omit<Product, "id" | "categoryName">) =>
+    request<Product>("/products", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  update: (id: number, data: Omit<Product, "id" | "categoryName">) =>
+    request<Product>(`/products/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  remove: (id: number) =>
+    request<void>(`/products/${id}`, { method: "DELETE" }),
+};
+
+export const customers = {
+  list: (search = "") => {
+    const q = new URLSearchParams({ page: "1", pageSize: "100" });
+    if (search) q.set("search", search);
+    return request<PagedResponse<Customer>>(`/customers?${q}`);
+  },
+  get: (id: number) => request<Customer>(`/customers/${id}`),
+  create: (data: Omit<Customer, "id" | "createdAt">) =>
+    request<Customer>("/customers", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  update: (id: number, data: Omit<Customer, "id" | "createdAt">) =>
+    request<Customer>(`/customers/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  remove: (id: number) =>
+    request<void>(`/customers/${id}`, { method: "DELETE" }),
+};
+
+export const sales = {
+  list: (p?: {
+    from?: string;
+    to?: string;
+    customerId?: number;
+    status?: string;
+    page?: number;
+    pageSize?: number;
+  }) => {
+    const q = new URLSearchParams({
+      page: String(p?.page ?? 1),
+      pageSize: String(p?.pageSize ?? 100),
+    });
+    if (p?.from) q.set("from", p.from);
+    if (p?.to) q.set("to", p.to);
+    if (p?.customerId) q.set("customerId", String(p.customerId));
+    if (p?.status) q.set("status", p.status);
+    return request<PagedResponse<SaleListItem>>(`/sales?${q}`);
+  },
+  get: (id: number) => request<Sale>(`/sales/${id}`),
+  create: (data: {
+    customerId: number | null;
+    paymentMethod: string;
+    discount: number;
+    paidAmount: number;
+    items: { productId: number; quantity: number; unitPrice: number }[];
+  }) => request<Sale>("/sales", { method: "POST", body: JSON.stringify(data) }),
+  returnSale: (
+    id: number,
+    data: { reason: string; items: { saleItemId: number; quantity: number }[] },
+  ) =>
+    request<Sale>(`/sales/${id}/return`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+};
+
+export const dashboard = {
+  summary: () => request<DashboardSummary>("/dashboard/summary"),
+  topProducts: (from?: string, to?: string) => {
+    const q = new URLSearchParams();
+    if (from) q.set("from", from);
+    if (to) q.set("to", to);
+    return request<TopProduct[]>(`/dashboard/top-products?${q}`);
+  },
+  salesByDay: (from?: string, to?: string) => {
+    const q = new URLSearchParams();
+    if (from) q.set("from", from);
+    if (to) q.set("to", to);
+    return request<SalesByDay[]>(`/dashboard/sales-by-day?${q}`);
+  },
+};
+
+export const users = {
+  list: () => request<PagedResponse<User>>("/users?page=1&pageSize=100"),
+  create: (data: {
+    username: string;
+    fullName: string;
+    password: string;
+    role: string;
+    isActive: boolean;
+  }) => request<User>("/users", { method: "POST", body: JSON.stringify(data) }),
+  update: (
+    id: number,
+    data: { fullName: string; role: string; isActive: boolean },
+  ) =>
+    request<User>(`/users/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  password: (id: number, newPassword: string) =>
+    request<void>(`/users/${id}/password`, {
+      method: "PUT",
+      body: JSON.stringify({ newPassword }),
+    }),
+  remove: (id: number) => request<void>(`/users/${id}`, { method: "DELETE" }),
+};
+
+export const settings = {
+  get: () => request<Settings>("/settings"),
+  update: (data: Settings) =>
+    request<Settings>("/settings", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
 };
