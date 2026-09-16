@@ -1,17 +1,18 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using MiniPos.Api.Data;
 using MiniPos.Api.Dtos;
-using MiniPos.Api.Interfaces;
+using MiniPos.Api.Models;
 
 namespace MiniPos.Api.Controllers;
 
 [ApiController]
 [Authorize]
 [Route("api/customers")]
-public class CustomersController(ICustomerRepo repo, ILogger<CustomersController> logger) : ControllerBase
+public class CustomersController(AppDbContext db) : ControllerBase
 {
-    private readonly ICustomerRepo _repo = repo;
-    private readonly ILogger<CustomersController> _logger = logger;
+    private readonly AppDbContext _db = db;
 
     [HttpGet]
     public async Task<ActionResult<PagedResponse<CustomerResponse>>> GetCustomers(
@@ -22,43 +23,63 @@ public class CustomersController(ICustomerRepo repo, ILogger<CustomersController
         page = page < 1 ? 1 : page;
         pageSize = pageSize is < 1 or > 100 ? 20 : pageSize;
 
-        var (items, total) = await _repo.GetPagedCustomersAsync(search, page, pageSize);
-        var resp = new PagedResponse<CustomerResponse> { Items = items.ToList(), Page = page, PageSize = pageSize, Total = total };
+        var query = _db.Customers.AsQueryable();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var pattern = $"%{search}%";
+            query = query.Where(c => EF.Functions.ILike(c.FullName, pattern) || EF.Functions.ILike(c.Email, pattern) || EF.Functions.ILike(c.Phone, pattern));
+        }
+
+        var total = await query.CountAsync();
+        var items = await query.OrderByDescending(c => c.CreatedAt).Skip((page - 1) * pageSize).Take(pageSize)
+            .Select(c => new CustomerResponse(c.Id, c.FullName, c.Phone, c.Email, c.Note, c.CreatedAt))
+            .ToListAsync();
+
+        var resp = new PagedResponse<CustomerResponse> { Items = items, Page = page, PageSize = pageSize, Total = total };
         return Ok(resp);
     }
 
-    [HttpGet("{id:guid}")]
-    public async Task<ActionResult<CustomerResponse>> GetCustomer(Guid id)
+    [HttpGet("{id:int}")]
+    public async Task<ActionResult<CustomerResponse>> GetCustomer(int id)
     {
-        var customer = await _repo.GetByIdAsync(id);
-        if (customer == null) return NotFound(new { message = "Customer not found." });
-        return Ok(customer);
+        var customer = await _db.Customers.FindAsync(id);
+        if (customer == null) return NotFound(new { error = "Customer not found." });
+        var dto = new CustomerResponse(customer.Id, customer.FullName, customer.Phone, customer.Email, customer.Note, customer.CreatedAt);
+        return Ok(dto);
     }
 
     [HttpPost]
     public async Task<ActionResult<CustomerResponse>> CreateCustomer(CreateCustomerRequest request)
     {
-        var created = await _repo.CreateCustomer(request);
-        _logger.LogInformation("Created customer {Name}", created.FullName);
-        return CreatedAtAction(nameof(GetCustomer), new { id = created.Id }, created);
+        var customer = new Customer { FullName = request.FullName, Phone = request.Phone, Email = request.Email, Note = request.Note, CreatedAt = DateTime.UtcNow };
+        await _db.Customers.AddAsync(customer);
+        await _db.SaveChangesAsync();
+        var dto = new CustomerResponse(customer.Id, customer.FullName, customer.Phone, customer.Email, customer.Note, customer.CreatedAt);
+        return CreatedAtAction(nameof(GetCustomer), new { id = customer.Id }, dto);
     }
 
-    [HttpPut("{id:guid}")]
-    public async Task<ActionResult> UpdateCustomer(Guid id, UpdateCustomerRequest request)
+    [HttpPut("{id:int}")]
+    public async Task<ActionResult> UpdateCustomer(int id, UpdateCustomerRequest request)
     {
-        var ok = await _repo.UpdateCustomer(id, request);
-        if (!ok) return NotFound(new { message = "Customer not found." });
-        _logger.LogInformation("Updated customer {Id}", id);
-        return NoContent();
+        var customer = await _db.Customers.FindAsync(id);
+        if (customer == null) return NotFound(new { error = "Customer not found." });
+        customer.FullName = request.FullName;
+        customer.Phone = request.Phone;
+        customer.Email = request.Email;
+        customer.Note = request.Note;
+        _db.Customers.Update(customer);
+        await _db.SaveChangesAsync();
+        return Ok(new { message = "Updated Customer successfully." });
     }
 
-    [HttpDelete("{id:guid}")]
+    [HttpDelete("{id:int}")]
     [Authorize(Roles = "Admin,Manager")]
-    public async Task<IActionResult> DeleteCustomer(Guid id)
+    public async Task<IActionResult> DeleteCustomer(int id)
     {
-        var ok = await _repo.DeleteCustomer(id);
-        if (!ok) return NotFound(new { message = "Customer not found." });
-        _logger.LogInformation("Deleted customer {Id}", id);
-        return NoContent();
+        var customer = await _db.Customers.FindAsync(id);
+        if (customer == null) return NotFound(new { error = "Customer not found." });
+        _db.Customers.Remove(customer);
+        await _db.SaveChangesAsync();
+        return Ok(new { message = "Deleted Customer successfully." });
     }
 }

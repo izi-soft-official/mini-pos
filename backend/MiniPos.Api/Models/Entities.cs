@@ -2,7 +2,7 @@ namespace MiniPos.Api.Models;
 
 public class User
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public int Id { get; set; }
     public string Username { get; set; } = string.Empty;
     public string PasswordHash { get; set; } = string.Empty;
     public string FullName { get; set; } = string.Empty;
@@ -12,7 +12,7 @@ public class User
 
 public class Category
 {
-    public Guid Id { get; set; }
+    public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public bool IsActive { get; set; } = true;
 
@@ -21,10 +21,10 @@ public class Category
 
 public class Product
 {
-    public Guid Id { get; set; }
+    public int Id { get; set; }
     public string Sku { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
-    public Guid CategoryId { get; set; }
+    public int CategoryId { get; set; }
     public decimal Price { get; set; }
     public decimal Cost { get; set; }
     public int Stock { get; set; }
@@ -35,21 +35,21 @@ public class Product
 
 public class Customer
 {
-    public Guid Id { get; set; }
+    public int Id { get; set; }
     public string FullName { get; set; } = string.Empty;
     public string Phone { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public string Note { get; set; } = string.Empty;
-    public DateTime CreatedAt { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
 public class Sale
 {
-    public Guid Id { get; set; }
+    public int Id { get; set; }
     public string Number { get; set; } = string.Empty;
-    public DateTime CreatedAt { get; set; }
-    public Guid? CustomerId { get; set; }
-    public Guid? UserId { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public int? CustomerId { get; set; }
+    public int? UserId { get; set; }
     public decimal Subtotal { get; set; }
     public decimal Discount { get; set; }
     public decimal Total { get; set; }
@@ -66,9 +66,9 @@ public class Sale
 
 public class SaleItem
 {
-    public Guid Id { get; set; }
-    public Guid SaleId { get; set; }
-    public Guid ProductId { get; set; }
+    public int Id { get; set; }
+    public int SaleId { get; set; }
+    public int ProductId { get; set; }
     public int Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal LineTotal { get; set; }
@@ -80,7 +80,7 @@ public class SaleItem
 
 public class Setting
 {
-    public Guid Id { get; set; }
+    public int Id { get; set; }
     public string Language { get; set; } = "en";
     public string Theme { get; set; } = "light";
     public int LowStockThreshold { get; set; } = 5;

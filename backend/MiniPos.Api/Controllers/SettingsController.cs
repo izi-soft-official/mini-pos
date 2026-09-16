@@ -1,31 +1,47 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using MiniPos.Api.Data;
 using MiniPos.Api.Dtos;
-using MiniPos.Api.Interfaces;
+using MiniPos.Api.Models;
 
 namespace MiniPos.Api.Controllers;
 
 [ApiController]
 [Authorize]
 [Route("api/settings")]
-public class SettingsController(ISettingsRepo repo, ILogger<SettingsController> logger) : ControllerBase
+public class SettingsController(AppDbContext db) : ControllerBase
 {
-    private readonly ISettingsRepo _repo = repo;
-    private readonly ILogger<SettingsController> _logger = logger;
+    private readonly AppDbContext _db = db;
 
     [HttpGet]
     public async Task<ActionResult<SettingsResponse>> GetSettings()
     {
-        var s = await _repo.GetSettingsAsync();
-        return Ok(s);
+        var s = await _db.Settings.FirstOrDefaultAsync();
+        if (s == null) return NotFound(new { error = "Settings not found." });
+        var resp = new SettingsResponse(s.Language, s.Theme, s.LowStockThreshold);
+        return Ok(resp);
     }
 
     [HttpPut]
     [Authorize(Roles = "Admin")]
     public async Task<ActionResult<SettingsResponse>> UpdateSettings(UpdateSettingsRequest request)
     {
-        var s = await _repo.UpdateSettingsAsync(request);
-        _logger.LogInformation("Updated settings");
-        return Ok(s);
+        var s = await _db.Settings.FirstOrDefaultAsync();
+        if (s == null)
+        {
+            s = new Setting { Language = request.Language, Theme = request.Theme, LowStockThreshold = request.LowStockThreshold };
+            await _db.Settings.AddAsync(s);
+        }
+        else
+        {
+            s.Language = request.Language;
+            s.Theme = request.Theme;
+            s.LowStockThreshold = request.LowStockThreshold;
+            _db.Settings.Update(s);
+        }
+
+        await _db.SaveChangesAsync();
+        return Ok(new SettingsResponse(s.Language, s.Theme, s.LowStockThreshold));
     }
 }

@@ -2,7 +2,7 @@ namespace MiniPos.Api.Dtos;
 
 public class UsersDto
 {
-    public record UserResponse(Guid Id, string Username, string FullName, string Role, bool IsActive);
+    public record UserResponse(int Id, string Username, string FullName, string Role, bool IsActive);
     public record CreateUserRequest
     {
         public string Username { get; set; } = string.Empty;

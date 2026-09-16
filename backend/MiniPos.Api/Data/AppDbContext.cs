@@ -15,14 +15,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // Ensure pgcrypto extension is available for gen_random_uuid()
-        modelBuilder.HasPostgresExtension("pgcrypto");
-
+        // Id columns as integer identity
         modelBuilder.Entity<User>(entity =>
         {
             entity.Property(u => u.Id)
-                .HasColumnType("uuid")
-                .HasDefaultValueSql("gen_random_uuid()");
+                .HasColumnType("integer")
+                .ValueGeneratedOnAdd();
 
             entity.Property(u => u.Username).HasMaxLength(50).IsRequired();
             entity.Property(u => u.PasswordHash).HasMaxLength(255).IsRequired();
@@ -34,8 +32,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<Category>(entity =>
         {
             entity.Property(c => c.Id)
-                .HasColumnType("uuid")
-                .HasDefaultValueSql("gen_random_uuid()");
+                .HasColumnType("integer")
+                .ValueGeneratedOnAdd();
 
             entity.Property(c => c.Name).HasMaxLength(80).IsRequired();
             entity.HasIndex(c => c.Name).IsUnique();
@@ -44,8 +42,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<Product>(entity =>
         {
             entity.Property(p => p.Id)
-                .HasColumnType("uuid")
-                .HasDefaultValueSql("gen_random_uuid()");
+                .HasColumnType("integer")
+                .ValueGeneratedOnAdd();
 
             entity.Property(p => p.Sku).HasMaxLength(40).IsRequired();
             entity.Property(p => p.Name).HasMaxLength(150).IsRequired();
@@ -61,8 +59,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<Customer>(entity =>
         {
             entity.Property(c => c.Id)
-                .HasColumnType("uuid")
-                .HasDefaultValueSql("gen_random_uuid()");
+                .HasColumnType("integer")
+                .ValueGeneratedOnAdd();
 
             entity.Property(c => c.FullName).HasMaxLength(120).IsRequired();
             entity.Property(c => c.Phone).HasMaxLength(40);
@@ -74,8 +72,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<Sale>(entity =>
         {
             entity.Property(s => s.Id)
-                .HasColumnType("uuid")
-                .HasDefaultValueSql("gen_random_uuid()");
+                .HasColumnType("integer")
+                .ValueGeneratedOnAdd();
 
             entity.Property(s => s.Number).HasMaxLength(20).IsRequired();
             entity.Property(s => s.PaymentMethod).HasMaxLength(20).IsRequired();
@@ -101,8 +99,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<SaleItem>(entity =>
         {
             entity.Property(i => i.Id)
-                .HasColumnType("uuid")
-                .HasDefaultValueSql("gen_random_uuid()");
+                .HasColumnType("integer")
+                .ValueGeneratedOnAdd();
 
             entity.Property(i => i.UnitPrice).HasColumnType("numeric(14,3)");
             entity.Property(i => i.LineTotal).HasColumnType("numeric(14,3)");
@@ -119,8 +117,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<Setting>(entity =>
         {
             entity.Property(s => s.Id)
-                .HasColumnType("uuid")
-                .HasDefaultValueSql("gen_random_uuid()");
+                .HasColumnType("integer")
+                .ValueGeneratedOnAdd();
 
             entity.Property(s => s.Language).HasMaxLength(5).IsRequired();
             entity.Property(s => s.Theme).HasMaxLength(10).IsRequired();

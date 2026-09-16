@@ -1,17 +1,19 @@
+using Isopoh.Cryptography.Argon2;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using MiniPos.Api.Interfaces;
-using static MiniPos.Api.Dtos.UsersDto;
+using Microsoft.EntityFrameworkCore;
+using MiniPos.Api.Data;
+using MiniPos.Api.Dtos;
+using MiniPos.Api.Models;
 
 namespace MiniPos.Api.Controllers;
 
 [ApiController]
 [Authorize(Roles = "Admin")]
 [Route("api/users")]
-public class UsersController(IUserRepo userRepo, ILogger<UsersController> logger) : ControllerBase
+public class UsersController(AppDbContext db) : ControllerBase
 {
-    private readonly IUserRepo _userRepo = userRepo;
-    private readonly ILogger<UsersController> _logger = logger;
+    private readonly AppDbContext _db = db;
 
     [HttpGet]
     public async Task<ActionResult> GetUsers(
@@ -24,9 +26,17 @@ public class UsersController(IUserRepo userRepo, ILogger<UsersController> logger
             page = page < 1 ? 1 : page;
             pageSize = pageSize is < 1 or > 100 ? 20 : pageSize;
 
-            var (users, totalCount) = await _userRepo.GetPagedUsersAsync(search, page, pageSize);
+            var query = _db.Users.AsQueryable();
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var pattern = $"%{search}%";
+                query = query.Where(u => EF.Functions.ILike(u.Username, pattern) || EF.Functions.ILike(u.FullName, pattern));
+            }
 
-            _logger.LogInformation("Got the paged users successfully.");
+            var totalCount = await query.CountAsync();
+            var users = await query.Skip((page - 1) * pageSize).Take(pageSize)
+                .Select(u => new UsersDto.UserResponse(u.Id, u.Username, u.FullName, u.Role, u.IsActive))
+                .ToListAsync();
 
             return Ok(new
             {
@@ -37,67 +47,75 @@ public class UsersController(IUserRepo userRepo, ILogger<UsersController> logger
                 data = users
             });
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogError(ex, "Failed trying to retrieve users.");
-            return StatusCode(503, new { message = "Error From The Database" });
+            return StatusCode(503, new { error = "Error From The Database" });
         }
     }
 
     [HttpPost]
-    public async Task<ActionResult<UserResponse>> CreateUser([FromBody] CreateUserRequest request)
+    public async Task<ActionResult<UsersDto.UserResponse>> CreateUser([FromBody] UsersDto.CreateUserRequest request)
     {
         try
         {
-            var user = await _userRepo.CreateUser(request);
-            return CreatedAtAction(nameof(GetUsers), new { id = user.Id }, user);
+            if (await _db.Users.AnyAsync(u => u.Username == request.Username))
+                throw new InvalidOperationException("Username already exists");
+
+            var user = new User
+            {
+                Username = request.Username,
+                FullName = request.FullName,
+                PasswordHash = Argon2.Hash(request.Password),
+                Role = request.Role,
+                IsActive = request.IsActive
+            };
+            await _db.Users.AddAsync(user);
+            await _db.SaveChangesAsync();
+            var dto = new UsersDto.UserResponse(user.Id, user.Username, user.FullName, user.Role, user.IsActive);
+            return CreatedAtAction(nameof(GetUsers), new { id = user.Id }, dto);
 
         }
         catch (InvalidOperationException ex)
         {
-            _logger.LogWarning(ex, "Failed to create user due to validation error");
-            return BadRequest(new { ex.Message });
+            return BadRequest(new { error = ex.Message });
         }
     }
 
-    [HttpPut("{id:guid}")]
-    public async Task<ActionResult> UpdateUser(Guid id, [FromBody] UpdateUserRequest request)
+    [HttpPut("{id:int}")]
+    public async Task<ActionResult> UpdateUser(int id, [FromBody] UsersDto.UpdateUserRequest request)
     {
-        var updateSuccess = await _userRepo.UpdateUser(id, request);
-        _logger.LogInformation("User updated successfully");
-        if (!updateSuccess)
-        {
-            return Conflict(new { Message = "Failed to update user. User may not exist or data is invalid." });
-        }
-        return Ok(new { Message = "User Updated Successfully." });
+        var user = await _db.Users.FindAsync(id);
+        if (user == null) return NotFound(new { error = "User not found." });
+        user.FullName = request.FullName;
+        user.Role = request.Role;
+        user.IsActive = request.IsActive;
+        _db.Users.Update(user);
+        await _db.SaveChangesAsync();
+        return Ok(new { message = "User Updated Successfully." });
     }
 
-    [HttpPut("{id:guid}/password")]
-    public async Task<ActionResult> ChangePassword(Guid id, [FromBody] ChangePasswordRequest request)
+    [HttpPut("{id:int}/password")]
+    public async Task<ActionResult> ChangePassword(int id, [FromBody] UsersDto.ChangePasswordRequest request)
     {
-        var updateSuccess = await _userRepo.ChangePassword(id, request);
-        _logger.LogInformation("Password changed successfully");
+        var user = await _db.Users.FindAsync(id);
+        if (user == null) return NotFound(new { error = "User not found." });
+        if (!Argon2.Verify(user.PasswordHash, request.OldPassword))
+            return BadRequest(new { error = "Failed to update Password, Check the Current Password" });
 
-        if (!updateSuccess)
-        {
-            return BadRequest(new { Message = "Failed to update Password, Check the Current Password" });
-        }
-
-
-        return Ok(new { Message = "Password Changed Successfully." });
+        user.PasswordHash = Argon2.Hash(request.NewPassword);
+        _db.Users.Update(user);
+        await _db.SaveChangesAsync();
+        return Ok(new { message = "Password Changed Successfully." });
 
     }
 
-    [HttpDelete("{id:guid}")]
-    public async Task<ActionResult> DeleteUser(Guid id)
+    [HttpDelete("{id:int}")]
+    public async Task<ActionResult> DeleteUser(int id)
     {
-        var RemovedUser = await _userRepo.DeleteUser(id);
-        _logger.LogInformation("User deleted successfully");
-
-        if (!RemovedUser)
-        {
-            return NotFound(new { Message = "Failed to delete user. User may not exist." });
-        }
-        return Ok(new { Message = "User deleted successfully." });
+        var user = await _db.Users.FindAsync(id);
+        if (user == null) return NotFound(new { error = "Failed to delete user. User may not exist." });
+        _db.Users.Remove(user);
+        await _db.SaveChangesAsync();
+        return Ok(new { message = "User deleted successfully." });
     }
 }

@@ -1,7 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using MiniPos.Api.Data;
 using MiniPos.Api.Dtos;
-using MiniPos.Api.Interfaces;
 using MiniPos.Api.Models;
 
 namespace MiniPos.Api.Controllers;
@@ -9,24 +10,41 @@ namespace MiniPos.Api.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/products")]
-public class ProductsController(ILogger<ProductsController> logger, IProductRepo productRepo) : ControllerBase
+public class ProductsController(AppDbContext db) : ControllerBase
 {
-    private readonly ILogger<ProductsController> _logger = logger;
-    private readonly IProductRepo _repo = productRepo;
+    private readonly AppDbContext _db = db;
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<ProductResponse>>> GetAllProducts(
+    public async Task<ActionResult> GetAllProducts(
         [FromQuery] string? search,
-        [FromQuery] Guid? categoryId,
+        [FromQuery] int? categoryId,
         [FromQuery] bool activeOnly = false,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        var products = await _repo.GetAllAsync(search, categoryId, activeOnly, page, pageSize);
-        if (products.Count() < 1)
+        var query = _db.Products.Include(p => p.Category).AsQueryable();
+
+        if (activeOnly)
         {
-            _logger.LogInformation("No products found for the given criteria");
-            return NotFound(new { message = "No products found." });
+            query = query.Where(p => p.IsActive);
+        }
+
+        if (categoryId.HasValue)
+        {
+            query = query.Where(p => p.CategoryId == categoryId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var pattern = $"%{search}%";
+            query = query.Where(p => EF.Functions.ILike(p.Name, pattern) || EF.Functions.ILike(p.Sku, pattern));
+        }
+
+        var total = await query.CountAsync();
+        var products = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+        if (products.Count < 1)
+        {
+            return NotFound(new { error = "No products found." });
         }
 
         var response = products.Select(p => new ProductResponse(
@@ -41,18 +59,19 @@ public class ProductsController(ILogger<ProductsController> logger, IProductRepo
             p.IsActive
         ));
 
-        _logger.LogInformation("Retrieved {Count} products", response.Count());
 
-        return Ok(response);
+
+        var list = response.ToList();
+        return Ok(new { items = list, page = page, pageSize = pageSize, total });
     }
 
-    [HttpGet("{id}")]
-    public async Task<ActionResult<ProductResponse>> GetProduct(Guid id)
+    [HttpGet("{id:int}")]
+    public async Task<ActionResult<ProductResponse>> GetProduct(int id)
     {
-        var product = await _repo.GetByIdAsync(id);
+        var product = await _db.Products.Include(p => p.Category).FirstOrDefaultAsync(p => p.Id == id);
         if (product == null)
         {
-            return NotFound(new { message = "Product not found." });
+            return NotFound(new { error = "Product not found." });
         }
 
         var response = new ProductResponse(
@@ -76,7 +95,7 @@ public class ProductsController(ILogger<ProductsController> logger, IProductRepo
     {
         var product = new Product
         {
-            Id = Guid.NewGuid(),
+            // Id is an int identity column - let the database assign it
             Sku = request.Sku,
             Name = request.Name,
             CategoryId = request.CategoryId,
@@ -86,11 +105,11 @@ public class ProductsController(ILogger<ProductsController> logger, IProductRepo
             IsActive = true
         };
 
-        await _repo.AddAsync(product);
-        await _repo.SaveChangesAsync();
+        await _db.Products.AddAsync(product);
+        await _db.SaveChangesAsync();
 
-        var createdProduct = await _repo.GetByIdAsync(product.Id);
-        _logger.LogInformation("Created new product with Name {ProductName}", createdProduct?.Name);
+        var createdProduct = await _db.Products.Include(p => p.Category).FirstOrDefaultAsync(p => p.Id == product.Id);
+
 
         var response = new ProductResponse(
             createdProduct!.Id,
@@ -104,15 +123,15 @@ public class ProductsController(ILogger<ProductsController> logger, IProductRepo
             createdProduct.IsActive
         );
 
-        return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, response);
+        return CreatedAtAction(nameof(GetProduct), new { id = response.Id }, response);
     }
 
-    [HttpPut("{id}")]
+    [HttpPut("{id:int}")]
     [Authorize(Roles = "Admin,Manager")]
-    public async Task<IActionResult> Update(Guid id, UpdateProductRequest updateDto)
+    public async Task<IActionResult> Update(int id, UpdateProductRequest updateDto)
     {
-        var product = await _repo.GetByIdAsync(id);
-        if (product == null) return NotFound(new { message = "Product not found." });
+        var product = await _db.Products.FindAsync(id);
+        if (product == null) return NotFound(new { error = "Product not found." });
 
         product.Sku = updateDto.Sku;
         product.Name = updateDto.Name;
@@ -122,24 +141,22 @@ public class ProductsController(ILogger<ProductsController> logger, IProductRepo
         product.Stock = updateDto.Stock;
         product.IsActive = updateDto.IsActive;
 
-        _repo.Update(product);
-        await _repo.SaveChangesAsync();
-        _logger.LogInformation("Updated product with Name {ProductName} successfully", product.Name);
+        _db.Products.Update(product);
+        await _db.SaveChangesAsync();
 
-        return NoContent();
+        return Ok(new { message = "Updated Product Successfully." });
     }
 
-    [HttpDelete("{id}")]
+    [HttpDelete("{id:int}")]
     [Authorize(Roles = "Admin,Manager")]
-    public async Task<IActionResult> Delete(Guid id)
+    public async Task<IActionResult> Delete(int id)
     {
-        var product = await _repo.GetByIdAsync(id);
-        if (product == null) return NotFound(new { message = "Product not found." });
+        var product = await _db.Products.FindAsync(id);
+        if (product == null) return NotFound(new { error = "Product not found." });
 
-        await _repo.DeleteAsync(id);
-        await _repo.SaveChangesAsync();
-        _logger.LogInformation("Deleted product Successfully");
+        _db.Products.Remove(product);
+        await _db.SaveChangesAsync();
 
-        return NoContent();
+        return Ok(new { message = "Deleted Product Successfully." });
     }
 }

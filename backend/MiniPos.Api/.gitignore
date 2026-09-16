@@ -1,0 +1,4 @@
+# Ignore appsettings files for this project (local overrides)
+appsettings.json
+appsettings.Development.json
+appsettings.*.local.json

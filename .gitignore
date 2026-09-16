@@ -19,3 +19,8 @@ venv/
 .vscode/
 .idea/
 .DS_Store
+
+# Ignore appsettings files with secrets
+appsettings.json
+appsettings.Development.json
+appsettings.*.local.json

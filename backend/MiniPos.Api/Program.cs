@@ -1,14 +1,9 @@
 using System.Text;
-using FluentValidation;
-using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using MiniPos.Api.Data;
-using MiniPos.Api.Interfaces;
-using MiniPos.Api.Repositories;
-using MiniPos.Api.Services;
 
 
 
@@ -28,16 +23,6 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(defaultConn));
 
 
-builder.Services.AddScoped<IUserRepo, UserRepo>();
-builder.Services.AddScoped<IAuthRepo, AuthRepo>();
-builder.Services.AddScoped<ITokenService, TokenService>();
-builder.Services.AddScoped<IProductRepo, ProductRepo>();
-builder.Services.AddScoped<ICategoryRepo, CategoryRepo>();
-builder.Services.AddScoped<ICustomerRepo, CustomerRepo>();
-builder.Services.AddScoped<ISettingsRepo, SettingsRepo>();
-builder.Services.AddScoped<ISaleRepo, SaleRepo>();
-builder.Services.AddScoped<IDashboardRepo, DashboardRepo>();
-builder.Services.AddSingleton<IHashingService, HashingService>();
 
 
 builder.Services.AddAuthentication(options =>
@@ -61,7 +46,12 @@ builder.Services.AddAuthentication(options =>
 
 
 builder.Services.AddAuthorization();
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(opts =>
+    {
+        opts.JsonSerializerOptions.Converters.Add(new MiniPos.Api.Services.DecimalJsonConverter());
+        opts.JsonSerializerOptions.Converters.Add(new MiniPos.Api.Services.NullableDecimalJsonConverter());
+    });
 builder.Services.AddEndpointsApiExplorer();
 
 builder.Services.AddSwaggerGen(options =>
@@ -81,19 +71,7 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-                     ?? [];
 
-builder.Services.AddCors(options =>
-  options.AddDefaultPolicy(policy => policy
-      .WithOrigins(allowedOrigins)
-      .AllowAnyHeader()
-      .AllowAnyMethod()));
-
-builder.Services.AddCustomRateLimiter();
-
-builder.Services.AddValidatorsFromAssemblyContaining<Program>();
-builder.Services.AddFluentValidationAutoValidation();
 
 var app = builder.Build();
 
@@ -102,10 +80,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseRateLimiter();
 app.MapControllers();
 
 
