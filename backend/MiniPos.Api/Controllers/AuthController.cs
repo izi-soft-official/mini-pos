@@ -68,7 +68,8 @@ public class AuthController(AppDbContext db, IConfiguration configuration) : Con
             new (ClaimTypes.NameIdentifier, user.Id.ToString())
         };
 
-        var expiresAt = DateTime.UtcNow.AddHours(Convert.ToDouble(jwtSettings["ExpiryHours"] ?? "2"));
+        var expiryMinutes = Convert.ToDouble(jwtSettings["ExpiryMinutes"] ?? "120");
+        var expiresAt = DateTime.UtcNow.AddMinutes(expiryMinutes);
 
         var tokenDescriptor = new Microsoft.IdentityModel.Tokens.SecurityTokenDescriptor
         {
