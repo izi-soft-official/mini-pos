@@ -34,9 +34,13 @@ Provided by the backend's seed data:
 
 - admin / admin123
 
-## Important backend status
+## 🌍 Multi-Language Support (Internationalization)
 
-The supplied backend throws `NotImplementedException` in the Dashboard, Users, and Settings controllers. The frontend is already wired to those routes, but those pages will show an "API unavailable" message until those backend methods are implemented.
+The application features full multi-language localization managed dynamically via client-side JSON dictionary context mappings.
+
+- **Dynamic Swapping:** Users can change runtime interfaces instantly between English (`en`) and French (`fr`) directly via the Settings view.
+
+## Important backend status
 
 The frontend does not store products, customers, or sales in `localStorage`. It only stores the JWT and the logged-in user's basic info locally, under the keys `mini-pos-token` and `mini-pos-user`.
 
@@ -45,7 +49,7 @@ The frontend does not store products, customers, or sales in `localStorage`. It 
 ```
 app/                  Pages (Next.js App Router)
 components/           Shared UI and app-wide logic
-lib/                  API client and shared types
+lib/                  API client and shared types and translation
 ```
 
 ### `app/` — pages
@@ -83,3 +87,5 @@ Each folder under `app/` is a route, and each contains a single `page.tsx`. All 
 | `api.ts` | The HTTP client. A single `request()` helper wraps `fetch`, attaches the JWT from `localStorage` as a Bearer token, sets JSON headers, and handles 401s (clears auth, redirects to `/login`) and non-OK responses (throws with the backend's error message). Everything else in the file is a small set of typed functions grouped by resource — `auth`, `categories`, `products`, `customers`, `sales`, `dashboard`, `users`, `settings` — each calling `request()` against the matching backend route. This is the only place `fetch` is called; pages never call the API directly. |
 | `types.ts` | Shared TypeScript types matching the backend's shapes: `User`, `Category`, `Product`, `Customer`, `Sale`/`SaleItem`/`SaleListItem`, `PagedResponse<T>`, `Settings`, `DashboardSummary`, `TopProduct`, `SalesByDay`. |
 | `db.ts` | **Legacy/unused.** Leftover seed data and `localStorage` helpers from an earlier, backend-less version of the app. Its types (`id: "u1"`, `category: string`, etc.) no longer match `types.ts`, and nothing in `app/` or `components/` imports from it. Safe to delete, kept here only as a historical artifact. |
+| `dictionaries.ts` | Serves as the language orchestration engine. Maps out dictionary objects dynamically and hooks up a Proxy fallback mechanism to serve raw key descriptions if individual language mappings are missing. |
+| `dictionaries/` | Directory tracking static translation map asset payloads (`en.json`, `fr.json`). |
