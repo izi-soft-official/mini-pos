@@ -11,8 +11,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        <Nav />
-        <main className="page">{children}</main>
+        <div className="flex min-h-screen">
+          <Nav />
+          <main className="page flex-1 overflow-y-auto p-6">{children}</main>
+        </div>
       </body>
     </html>
   );

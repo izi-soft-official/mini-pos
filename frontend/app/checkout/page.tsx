@@ -2,15 +2,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-
-interface Product {
-  id: string;
-  name: string;
-  sku: string;
-  category: string;
-  price: number;
-  stock: number;
-}
+import {
+  getProducts,
+  searchProducts,
+  addSale,
+  type Product,
+  type PaymentMethod,
+} from "@/lib/db";
 
 interface CartLine {
   productId: string;
@@ -19,17 +17,8 @@ interface CartLine {
   quantity: number;
 }
 
-type PaymentMethod = "cash" | "card" | "izipay";
-
-const mockProducts: Product[] = [
-  { id: "p1", sku: "STA-001", name: "Notebook", category: "Stationery", price: 5.0, stock: 3 },
-  { id: "p2", sku: "STA-002", name: "Pen Set", category: "Stationery", price: 12.5, stock: 15 },
-  { id: "p3", sku: "ELE-001", name: "Desk Lamp", category: "Electronics", price: 35.0, stock: 1 },
-  { id: "p4", sku: "STA-003", name: "Sticky Notes", category: "Stationery", price: 3.25, stock: 60 },
-  { id: "p5", sku: "ELE-002", name: "USB Cable", category: "Electronics", price: 7.99, stock: 25 },
-];
-
 export default function CheckoutPage() {
+  const [productList, setProductList] = useState<Product[]>(() => getProducts());
   const [query, setQuery] = useState("");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [discount, setDiscount] = useState("0");
@@ -39,11 +28,11 @@ export default function CheckoutPage() {
 
   const filteredProducts = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return mockProducts;
-    return mockProducts.filter(
+    if (!q) return productList;
+    return productList.filter(
       (p) => p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)
     );
-  }, [query]);
+  }, [query, productList]);
 
   function addToCart(product: Product) {
     setCart((prev) => {
@@ -91,7 +80,7 @@ export default function CheckoutPage() {
   function validateStock(): Record<string, string> {
     const errors: Record<string, string> = {};
     for (const line of cart) {
-      const product = mockProducts.find((p) => p.id === line.productId);
+      const product = productList.find((p) => p.id === line.productId);
       if (!product) {
         errors[line.productId] = "Product no longer exists.";
         continue;
@@ -104,7 +93,7 @@ export default function CheckoutPage() {
   }
 
   function completeSale() {
-    if (!canPay) return;
+    if (!canPay || !paymentMethod) return;
 
     const errors = validateStock();
     if (Object.keys(errors).length > 0) {
@@ -114,10 +103,11 @@ export default function CheckoutPage() {
 
     setStockErrors({});
 
-    const sale = {
+    addSale({
       number: `S-${Date.now()}`,
       createdAt: new Date().toISOString(),
       lines: cart.map((l) => ({
+        productId: l.productId,
         productName: l.name,
         quantity: l.quantity,
         unitPrice: l.unitPrice,
@@ -130,9 +120,11 @@ export default function CheckoutPage() {
       changeAmount,
       paymentMethod,
       status: "completed",
-    };
-    // TODO: replace with POST /api/sales once backend exists
-    console.log("Sale created:", sale);
+    });
+
+    // refresh local product list so updated stock shows in the table
+    setProductList(searchProducts(""));
+
     setCart([]);
     setDiscount("0");
     setPaid("");
