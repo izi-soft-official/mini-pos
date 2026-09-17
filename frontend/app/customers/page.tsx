@@ -5,11 +5,12 @@ import { customers, sales } from "@/lib/api";
 import type { Customer } from "@/lib/types";
 import { useApp } from "@/components/Providers";
 import { Plus, Pencil, Trash2, Search, Eye } from "@/components/Icons";
+import Link from "next/link";
 
 const empty = { fullName: "", phone: "", email: "", note: "" };
 
 export default function Customers() {
-  const { can } = useApp();
+  const { can, t } = useApp();
   const [items, setItems] = useState<Customer[]>([]),
     [q, setQ] = useState(""),
     [edit, setEdit] = useState<Customer | null>(null),
@@ -42,7 +43,7 @@ export default function Customers() {
   }
 
   async function del(id: number) {
-    if (!confirm("Delete customer?")) return;
+    if (!confirm(t.confirmDeleteCustomer)) return;
     try {
       await customers.remove(id);
       await load();
@@ -64,16 +65,16 @@ export default function Customers() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap justify-between gap-3">
-          <h1 className="text-2xl font-bold">Customers</h1>
+        <h1 className="text-2xl font-bold">{t.customers}</h1>
         <button className="btn-primary" onClick={() => setAdd(true)}>
-          <Plus size={17} /> Add customer
+          <Plus size={17} /> {t.addCustomer}
         </button>
       </div>
       <div className="card p-4">
         <div className="relative">
           <input
             className="input pl-9"
-            placeholder="Search name or phone"
+            placeholder={t.searchCustomerPlaceholder}
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
@@ -83,11 +84,11 @@ export default function Customers() {
         <table className="table">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Phone</th>
-              <th>Email</th>
-              <th>Created</th>
-              <th>Actions</th>
+              <th>{t.name}</th>
+              <th>{t.phone}</th>
+              <th>{t.email}</th>
+              <th>{t.created}</th>
+              <th>{t.actions}</th>
             </tr>
           </thead>
           <tbody>
@@ -144,15 +145,23 @@ export default function Customers() {
             <h2 className="text-lg font-bold">{history.fullName}</h2>
             <p className="mt-2 text-sm text-slate-500">{history.phone}</p>
             <div className="mt-5 rounded-lg bg-slate-50 p-4 dark:bg-slate-900">
-              <div className="text-sm text-slate-500">Total spent</div>
+              <div className="text-sm text-slate-500">{t.totalSpent}</div>
               <div className="text-2xl font-black">{total.toFixed(2)} DZD</div>
             </div>
-            <button
-              className="btn-secondary mt-5 w-full"
-              onClick={() => setHistory(null)}
-            >
-              Close
-            </button>
+            <div className="mt-5 space-y-2">
+              <Link
+                href={`/sales?customerId=${history.id}`}
+                className="btn-primary block text-center w-full font-semibold py-2 text-sm"
+              >
+                {t.viewPastPurchases}
+              </Link>
+              <button
+                className="btn-secondary w-full"
+                onClick={() => setHistory(null)}
+              >
+                {t.close}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -169,6 +178,7 @@ function CustomerModal({
   onClose: () => void;
   onSave: (f: typeof empty) => void;
 }) {
+  const { t } = useApp();
   const [f, setF] = useState(
     customer
       ? {
@@ -198,20 +208,22 @@ function CustomerModal({
   const isEmailValid =
     f.email.trim() === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim());
 
-  // 3. Complete Form Validation Check
+  // 3. Complete Form Validation Check (Ensures Name is filled out AND Phone validation passes)
   const isFormValid = f.fullName.trim() !== "" && isPhoneValid && isEmailValid;
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">
       <div className="card w-full max-w-lg p-6">
         <h2 className="text-lg font-bold">
-          {customer ? "Edit customer" : "Add customer"}
+          {customer ? t.editCustomer : t.addCustomer}
         </h2>
 
         <div className="mt-5 space-y-4">
           {/* Full Name Field */}
           <div>
-            <label className="mb-1 block text-sm font-medium">Full Name</label>
+            <label className="mb-1 block text-sm font-medium">
+              {t.fullNameLabel}
+            </label>
             <input
               className="input"
               placeholder="e.g. Mohamed Benali"
@@ -223,10 +235,10 @@ function CustomerModal({
           {/* Phone Field with dynamic chunked format layout spacer */}
           <div>
             <div className="flex justify-between items-center mb-1">
-              <label className="text-sm font-medium">Phone Number</label>
+              <label className="text-sm font-medium">{t.phoneNumber}</label>
               {rawPhone.length > 0 && !isPhoneValid && (
                 <span className="text-xs text-red-500 font-medium">
-                  Must be 10 digits starting with 0
+                  {t.phoneValidationError}
                 </span>
               )}
             </div>
@@ -244,10 +256,10 @@ function CustomerModal({
           {/* Email Field */}
           <div>
             <div className="flex justify-between items-center mb-1">
-              <label className="text-sm font-medium">Email Address</label>
+              <label className="text-sm font-medium">{t.emailAddress}</label>
               {!isEmailValid && (
                 <span className="text-xs text-red-500 font-medium">
-                  Invalid email address layout
+                  {t.emailValidationError}
                 </span>
               )}
             </div>
@@ -263,7 +275,7 @@ function CustomerModal({
           {/* Note Field */}
           <div>
             <label className="mb-1 block text-sm font-medium">
-              Internal Notes (Optional)
+              {t.internalNotes}
             </label>
             <textarea
               className="input min-h-24"
@@ -277,14 +289,14 @@ function CustomerModal({
         {/* Action Controls Panel */}
         <div className="mt-6 flex justify-end gap-2">
           <button className="btn-secondary" onClick={onClose}>
-            Cancel
+            {t.cancel}
           </button>
           <button
             className={`btn-primary ${!isFormValid ? "opacity-50 cursor-not-allowed" : ""}`}
             disabled={!isFormValid}
             onClick={() => onSave({ ...f, phone: rawPhone })} // Saves the clean raw 10-digit number back to C# database
           >
-            Save Customer
+            {t.saveCustomer}
           </button>
         </div>
       </div>

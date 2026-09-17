@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { customers, products, sales } from "@/lib/api";
 import type { Customer, Product } from "@/lib/types";
+import { useApp } from "@/components/Providers";
 import {
   Search,
   Plus,
@@ -15,6 +16,7 @@ import {
 type Cart = { product: Product; qty: number };
 
 export default function Checkout() {
+  const { t } = useApp();
   const [items, setItems] = useState<Product[]>([]),
     [custs, setCusts] = useState<Customer[]>([]),
     [q, setQ] = useState(""),
@@ -75,8 +77,8 @@ export default function Checkout() {
   }
 
   async function confirm() {
-    if (!cart.length) return alert("Cart is empty");
-    if (paid < total) return alert("Paid amount is less than total");
+    if (!cart.length) return alert(t.cartIsEmpty);
+    if (paid < total) return alert(t.paidAmountLess);
     setBusy(true);
     try {
       await sales.create({
@@ -90,7 +92,7 @@ export default function Checkout() {
           unitPrice: x.product.price,
         })),
       });
-      alert("Sale completed successfully");
+      alert(t.saleCompleted);
       setCart([]);
       setPaid(0);
       setDiscount(0);
@@ -102,16 +104,16 @@ export default function Checkout() {
       setBusy(false);
     }
   }
-  
+
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_420px]">
       <section className="space-y-4">
-        <h1 className="text-2xl font-bold">Checkout</h1>
+        <h1 className="text-2xl font-bold">{t.checkout}</h1>
         <div className="card p-4">
           <div className="relative">
             <input
               className="input pl-9"
-              placeholder="Search products"
+              placeholder={t.searchProducts}
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
@@ -128,7 +130,9 @@ export default function Checkout() {
                 <div className="text-xs text-slate-500">{p.sku}</div>
                 <div className="mt-2 flex justify-between">
                   <b>{p.price.toFixed(2)} DZD</b>
-                  <span className="text-xs">Stock: {p.stock}</span>
+                  <span className="text-xs">
+                    {t.stock}: {p.stock}
+                  </span>
                 </div>
               </button>
             ))}
@@ -139,11 +143,11 @@ export default function Checkout() {
         <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-slate-800">
           <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
             <ShoppingCart size={19} className="text-blue-600" />
-            Cart Basket
+            {t.cartBasket}
           </h2>
           {cart.length > 0 && (
             <span className="badge bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 font-bold px-2.5 py-0.5">
-              {cart.reduce((acc, item) => acc + item.qty, 0)} items
+              {cart.reduce((acc, item) => acc + item.qty, 0)} {t.cartItemsCount}
             </span>
           )}
         </div>
@@ -160,7 +164,7 @@ export default function Checkout() {
                     {x.product.name}
                   </span>
                   <span className="text-xs text-slate-400 mt-1">
-                    {x.product.price.toFixed(2)} DZD each
+                    {x.product.price.toFixed(2)} {t.each}
                   </span>
                 </div>
                 <span className="font-bold text-sm text-slate-900 dark:text-slate-100 whitespace-nowrap">
@@ -204,7 +208,7 @@ export default function Checkout() {
           {!cart.length && (
             <div className="py-8 text-center flex flex-col items-center justify-center text-slate-400 dark:text-slate-600">
               <Package size={26} className="mb-2 stroke-1" />
-              <p className="text-xs">No items added to current basket.</p>
+              <p className="text-xs">{t.noItemsBasket}</p>
             </div>
           )}
         </div>
@@ -212,14 +216,15 @@ export default function Checkout() {
         <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3.5">
           <div>
             <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">
-              Customer
+              {t.customer}
             </label>
             <select
               className="input h-10"
               value={customerId}
               onChange={(e) => setCustomerId(Number(e.target.value))}
             >
-              <option value={0}>Walk-in customer</option>
+              <option value={0}>{t.walkInCustomer}</option>
+
               {custs.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.fullName} · {c.phone}
@@ -231,22 +236,22 @@ export default function Checkout() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">
-                Payment Method
+                {t.paymentMethod}
               </label>
               <select
                 className="input h-10"
                 value={method}
                 onChange={(e) => setMethod(e.target.value)}
               >
-                <option>Cash</option>
-                <option>Card</option>
-                <option>IZI Pay</option>
+                <option value="Cash">{t.cash}</option>
+                <option value="Card">{t.card}</option>
+                <option value="IZI Pay">{t.iziPay}</option>
               </select>
             </div>
 
             <div>
               <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">
-                Discount
+                {t.discount}
               </label>
               <div className="relative">
                 <input
@@ -266,7 +271,7 @@ export default function Checkout() {
 
           <div>
             <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">
-              Paid Amount (Tendered)
+              {t.paidAmount}
             </label>
             <div className="relative">
               <input
@@ -286,21 +291,21 @@ export default function Checkout() {
 
         <div className="mt-5 space-y-2.5 rounded-xl bg-slate-50 p-4 dark:bg-slate-900/60 text-sm border border-slate-100 dark:border-slate-900">
           <div className="flex justify-between text-slate-500 dark:text-slate-400">
-            <span>Subtotal</span>
+            <span>{t.subtotal}</span>
             <span className="font-semibold">{subtotal.toFixed(2)} DZD</span>
           </div>
           <div className="flex justify-between text-red-600 dark:text-red-400">
-            <span>Discount</span>
+            <span>{t.discount}</span>
             <span className="font-semibold">-{discount.toFixed(2)} DZD</span>
           </div>
           <div className="flex justify-between border-t border-dashed border-slate-200 dark:border-slate-800 pt-2.5 text-base font-black text-slate-900 dark:text-slate-50">
-            <span>Total to Pay</span>
+            <span>{t.totalToPay}</span>
             <span className="text-lg text-blue-600 dark:text-blue-400">
               {total.toFixed(2)} DZD
             </span>
           </div>
           <div className="flex justify-between border-t border-slate-200/60 dark:border-slate-800 pt-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-            <span>Change Return</span>
+            <span>{t.changeReturn}</span>
             <span
               className={`font-bold ${change > 0 ? "text-amber-600 dark:text-amber-400 text-sm" : ""}`}
             >
@@ -317,10 +322,10 @@ export default function Checkout() {
           {busy ? (
             <span className="flex items-center justify-center gap-2">
               <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-              Processing...
+              {t.processing}
             </span>
           ) : (
-            "Confirm Sale"
+            t.confirmSale
           )}
         </button>
       </aside>

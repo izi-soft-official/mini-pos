@@ -18,44 +18,44 @@ import { useApp } from "./Providers";
 const links = [
   {
     href: "/",
-    label: "Dashboard",
+    label: "dashboard",
     icon: LayoutDashboard,
     permission: "dashboard",
   },
   {
     href: "/products",
-    label: "Products",
+    label: "products",
     icon: Package,
     permission: "products",
   },
   {
     href: "/checkout",
-    label: "Checkout",
+    label: "checkout",
     icon: ShoppingCart,
     permission: "checkout",
   },
   {
     href: "/sales",
-    label: "Sales History",
+    label: "salesHistory",
     icon: ClipboardList,
     permission: "sales",
   },
   {
     href: "/customers",
-    label: "Customers",
+    label: "customers",
     icon: Users,
     permission: "customers",
   },
   // {
   //   href: "/categories",
-  //   label: "Categories",
+  //   label: "categories",
   //   icon: Tag,
   //   permission: "categories",
   // },
-  // { href: "/users", label: "Users", icon: Users, permission: "users" },
+  { href: "/users", label: "users", icon: Users, permission: "users" },
   {
     href: "/settings",
-    label: "Settings",
+    label: "settings",
     icon: Settings,
     permission: "settings",
   },
@@ -69,16 +69,14 @@ export default function Sidebar({
   onClose: () => void;
 }) {
   const path = usePathname();
-  const { can } = useApp();
+  const { can, t } = useApp();
 
-  // close the drawer whenever the route changes
   useEffect(() => {
     onClose();
   }, [path]);
 
   return (
     <>
-      {/* Backdrop, mobile only, closes drawer on click */}
       {open && (
         <div
           className="fixed inset-0 z-40 bg-black/50 md:hidden"
@@ -86,7 +84,6 @@ export default function Sidebar({
         />
       )}
 
-      {/* Sidebar: fixed slide-in drawer on mobile, static docked panel on md+ */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 flex w-64 shrink-0 flex-col border-r border-slate-200 bg-white transition-transform duration-200 dark:border-slate-800 dark:bg-slate-950 md:static md:flex md:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
@@ -100,6 +97,7 @@ export default function Sidebar({
             .filter((x) => can(x.permission))
             .map((x) => {
               const I = x.icon;
+              const labelText = (t as any)[x.label] || x.label;
               return (
                 <Link
                   key={x.href}
@@ -107,7 +105,7 @@ export default function Sidebar({
                   className={`navlink ${path === x.href ? "active" : ""}`}
                 >
                   <I size={18} />
-                  {x.label}
+                  {labelText}
                 </Link>
               );
             })}

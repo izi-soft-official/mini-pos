@@ -6,7 +6,7 @@ import type { Settings } from "@/lib/types";
 import { useApp } from "@/components/Providers";
 
 export default function SettingsPage() {
-  const { user } = useApp();
+  const { user, t, setLang } = useApp(); //Access translation dictionary 't' and setLang handler
   const [s, setS] = useState<Settings>({
     language: "en",
     theme: "light",
@@ -17,7 +17,11 @@ export default function SettingsPage() {
   useEffect(() => {
     settings
       .get()
-      .then(setS)
+      .then((r) => {
+        setS(r);
+        setLang(r.language); //Update global language state on load
+        document.documentElement.classList.toggle("dark", r.theme === "dark");
+      })
       .catch((e) => setErr(e.message));
   }, []);
 
@@ -25,6 +29,7 @@ export default function SettingsPage() {
     try {
       const r = await settings.update(s);
       setS(r);
+      setLang(r.language); //Update global language state on save
       document.documentElement.classList.toggle("dark", r.theme === "dark");
       alert("Settings saved");
     } catch (e) {
@@ -39,16 +44,13 @@ export default function SettingsPage() {
         <p className="mt-2 text-sm text-slate-500">{err}</p>
       </div>
     );
-    
+
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="text-sm text-slate-500">Stored by the backend.</p>
-      </div>
+      <h1 className="text-2xl font-bold">{t.settings}</h1>
       <div className="card max-w-xl p-6 space-y-5">
         <div>
-          <label className="mb-1 block text-sm font-medium">Language</label>
+          <label className="mb-1 block text-sm font-medium">{t.language}</label>
           <select
             className="input"
             value={s.language}
@@ -59,7 +61,7 @@ export default function SettingsPage() {
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium">Theme</label>
+          <label className="mb-1 block text-sm font-medium">{t.theme}</label>
           <select
             className="input"
             value={s.theme}
@@ -71,7 +73,7 @@ export default function SettingsPage() {
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">
-            Low stock threshold
+            {t.lowStockThreshold}
           </label>
           <input
             className="input"
@@ -85,7 +87,7 @@ export default function SettingsPage() {
         </div>
         {user?.role === "Admin" && (
           <button className="btn-primary" onClick={save}>
-            Save settings
+            {t.saveSettings}
           </button>
         )}
       </div>

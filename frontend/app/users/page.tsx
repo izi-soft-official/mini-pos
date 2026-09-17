@@ -7,7 +7,7 @@ import { useApp } from "@/components/Providers";
 import { Plus, Pencil, Trash2, LockKeyhole } from "@/components/Icons";
 
 export default function UsersPage() {
-  const { user, can } = useApp();
+  const { user, can, t } = useApp();
   const [items, setItems] = useState<User[]>([]),
     [edit, setEdit] = useState<User | null>(null),
     [add, setAdd] = useState(false);
@@ -27,9 +27,9 @@ export default function UsersPage() {
   if (!can("users"))
     return (
       <div className="card p-8">
-        <h1 className="text-xl font-bold">Access denied</h1>
+        <h1 className="text-xl font-bold">{t.accessDenied}</h1>
         <p className="mt-2 text-sm text-slate-500">
-          Only administrators can manage users.
+          {t.adminOnlyManagementDesc}
         </p>
       </div>
     );
@@ -59,8 +59,8 @@ export default function UsersPage() {
   }
 
   async function del(id: number) {
-    if (id === user?.id) return alert("You cannot delete your own account.");
-    if (!confirm("Delete user?")) return;
+    if (id === user?.id) return alert(t.cannotDeleteOwnAccount);
+    if (!confirm(t.confirmDeleteUser)) return;
     try {
       await users.remove(id);
       await load();
@@ -73,24 +73,24 @@ export default function UsersPage() {
     <div className="space-y-5">
       <div className="flex justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Users</h1>
+          <h1 className="text-2xl font-bold">{t.users}</h1>
           <p className="text-sm text-slate-500">
-            Admin-only account management.
+            {t.adminOnlyAccountManagement}
           </p>
         </div>
         <button className="btn-primary" onClick={() => setAdd(true)}>
-          <Plus size={17} /> Add user
+          <Plus size={17} /> {t.addUser}
         </button>
       </div>
       <div className="card overflow-hidden">
         <table className="table">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Username</th>
-              <th>Role</th>
-              <th>Status</th>
-              <th>Actions</th>
+              <th>{t.name}</th>
+              <th>{t.username}</th>
+              <th>{t.role}</th>
+              <th>{t.status}</th>
+              <th>{t.actions}</th>
             </tr>
           </thead>
           <tbody>
@@ -99,7 +99,7 @@ export default function UsersPage() {
                 <td className="font-semibold">
                   {u.fullName}
                   {u.id === user?.id && (
-                    <span className="ml-2 text-xs text-blue-600">You</span>
+                    <span className="ml-2 text-xs text-blue-600">{t.you}</span>
                   )}
                 </td>
                 <td>{u.username}</td>
@@ -108,7 +108,7 @@ export default function UsersPage() {
                   <span
                     className={`badge ${u.isActive ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}
                   >
-                    {u.isActive ? "Active" : "Inactive"}
+                    {u.isActive ? t.active : t.inactive}
                   </span>
                 </td>
                 <td>
@@ -119,10 +119,10 @@ export default function UsersPage() {
                     >
                       <Pencil size={15} />
                     </button>
-                    <button
+                    {/* <button
                       className="btn-secondary px-3"
                       onClick={() => {
-                        const p = prompt("New password");
+                        const p = prompt(t.newPasswordPrompt);
                         if (p)
                           users
                             .password(u.id, p)
@@ -131,7 +131,7 @@ export default function UsersPage() {
                       }}
                     >
                       <LockKeyhole size={15} />
-                    </button>
+                    </button> */}
                     <button
                       className="btn-danger px-3"
                       disabled={u.id === user?.id}
@@ -175,28 +175,29 @@ function UserModal({
     isActive: boolean;
   }) => void;
 }) {
+  const { t } = useApp();
   const [f, setF] = useState({
     username: user?.username || "",
     fullName: user?.fullName || "",
     password: "",
-    role: (user?.role || "Cashier") as Role,
+    role: (user?.role || "User") as Role,
     isActive: user?.isActive ?? true,
   });
-  
+
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">
       <div className="card w-full max-w-lg p-6">
-        <h2 className="text-lg font-bold">{user ? "Edit user" : "Add user"}</h2>
+        <h2 className="text-lg font-bold">{user ? t.editUser : t.addUser}</h2>
         <div className="mt-5 space-y-3">
           <input
             className="input"
-            placeholder="Full name"
+            placeholder={t.fullNamePlaceholder}
             value={f.fullName}
             onChange={(e) => setF({ ...f, fullName: e.target.value })}
           />
           <input
             className="input"
-            placeholder="Username"
+            placeholder={t.usernamePlaceholder}
             disabled={!!user}
             value={f.username}
             onChange={(e) => setF({ ...f, username: e.target.value })}
@@ -204,7 +205,9 @@ function UserModal({
           <input
             className="input"
             type="password"
-            placeholder={user ? "New password (optional)" : "Password"}
+            placeholder={
+              user ? t.newPasswordOptionalPlaceholder : t.passwordPlaceholder
+            }
             value={f.password}
             onChange={(e) => setF({ ...f, password: e.target.value })}
           />
@@ -213,9 +216,9 @@ function UserModal({
             value={f.role}
             onChange={(e) => setF({ ...f, role: e.target.value as Role })}
           >
-            <option>Admin</option>
-            <option>Manager</option>
-            <option>Cashier</option>
+            <option value="Admin">Admin</option>
+            <option value="Manager">Manager</option>
+            <option value="User">User</option>
           </select>
           <label className="flex gap-2 text-sm">
             <input
@@ -223,19 +226,19 @@ function UserModal({
               checked={f.isActive}
               onChange={(e) => setF({ ...f, isActive: e.target.checked })}
             />{" "}
-            Active
+            {t.active}
           </label>
         </div>
         <div className="mt-6 flex justify-end gap-2">
           <button className="btn-secondary" onClick={onClose}>
-            Cancel
+            {t.cancel}
           </button>
           <button
             className="btn-primary"
             disabled={!f.fullName || !f.username || (!user && !f.password)}
             onClick={() => onSave(f)}
           >
-            Save
+            {t.save}
           </button>
         </div>
       </div>

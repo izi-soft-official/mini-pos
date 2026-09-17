@@ -8,7 +8,7 @@ import { LogOut, Menu } from "./Icons";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
-  const { user, loading, logout } = useApp();
+  const { user, loading, logout, t } = useApp();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -28,7 +28,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <button
             className="btn-secondary px-2 md:hidden"
             onClick={() => setSidebarOpen(true)}
-            aria-label="Open menu"
+            aria-label={t.openMenu}
           >
             <Menu size={20} />
           </button>
@@ -41,7 +41,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               onClick={logout}
             >
               <LogOut size={16} className="text-red-500 dark:text-red-400" />
-              Logout
+              {t.logout}
             </button>
           </div>
         </header>

@@ -3,9 +3,15 @@
 import { useEffect, useState } from "react";
 import { sales, customers } from "@/lib/api";
 import type { Sale, SaleListItem, Customer } from "@/lib/types";
+import { useApp } from "@/components/Providers";
 import { Eye, RefreshCw } from "@/components/Icons";
+import { useSearchParams } from "next/navigation";
 
 export default function Sales() {
+  const { can, t } = useApp();
+  const isOwnOnly = !can("sales") && can("salesOwn");
+  const searchParams = useSearchParams();
+
   const [items, setItems] = useState<SaleListItem[]>([]),
     [custs, setCusts] = useState<Customer[]>([]),
     [from, setFrom] = useState(""),
@@ -14,6 +20,16 @@ export default function Sales() {
     [selected, setSelected] = useState<Sale | null>(null),
     [err, setErr] = useState("");
   const [dateOrder, setDateOrder] = useState<"desc" | "asc">("desc");
+
+  useEffect(() => {
+    const urlFrom = searchParams.get("from");
+    const urlTo = searchParams.get("to");
+    const urlCust = searchParams.get("customerId");
+
+    if (urlFrom) setFrom(urlFrom);
+    if (urlTo) setTo(urlTo);
+    if (urlCust) setCustomerId(Number(urlCust));
+  }, [searchParams]);
 
   async function load() {
     try {
@@ -35,7 +51,7 @@ export default function Sales() {
 
   useEffect(() => {
     load();
-  }, [customerId]);
+  }, [customerId, from, to]);
 
   async function detail(id: number) {
     try {
@@ -45,12 +61,22 @@ export default function Sales() {
     }
   }
 
+  if (!can("sales") && !can("salesOwn"))
+    return (
+      <div className="card p-8">
+        <h1 className="text-xl font-bold">{t.salesUnavailable}</h1>
+        <p className="mt-2 text-sm text-slate-500">{t.noSalesAccess}</p>
+      </div>
+    );
+
   return (
     <div className="space-y-5">
       <div className="flex justify-between">
-        <h1 className="text-2xl font-bold">Sales History</h1>
+        <h1 className="text-2xl font-bold">
+          {isOwnOnly ? t.mySales : t.salesHistory}
+        </h1>
         <button className="btn-secondary" onClick={load}>
-          <RefreshCw size={16} /> Refresh
+          <RefreshCw size={16} /> {t.refresh}
         </button>
       </div>
       <div className="card p-4 flex flex-wrap gap-3">
@@ -66,18 +92,20 @@ export default function Sales() {
           value={to}
           onChange={(e) => setTo(e.target.value)}
         />
-        <select
-          className="input w-auto"
-          value={customerId}
-          onChange={(e) => setCustomerId(Number(e.target.value))}
-        >
-          <option value={0}>All customers</option>
-          {custs.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.fullName}
-            </option>
-          ))}
-        </select>
+        {!isOwnOnly && (
+          <select
+            className="input w-auto"
+            value={customerId}
+            onChange={(e) => setCustomerId(Number(e.target.value))}
+          >
+            <option value={0}>{t.allCustomers}</option>
+            {custs.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.fullName}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
       {err && (
         <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
@@ -88,13 +116,13 @@ export default function Sales() {
         <table className="table">
           <thead>
             <tr>
-              <th>Number</th>
-              <th>Date</th>
-              <th>Customer</th>
-              <th>Items</th>
-              <th>Total</th>
-              <th>Payment</th>
-              <th>Status</th>
+              <th>{t.number}</th>
+              <th>{t.date}</th>
+              <th>{t.customer}</th>
+              <th>{t.items}</th>
+              <th>{t.total}</th>
+              <th>{t.payment}</th>
+              <th>{t.status}</th>
               <th />
             </tr>
           </thead>
@@ -103,7 +131,7 @@ export default function Sales() {
               <tr key={s.id}>
                 <td className="font-semibold">{s.number}</td>
                 <td>{new Date(s.createdAt).toLocaleString()}</td>
-                <td>{s.customerName || "Walk-in"}</td>
+                <td>{s.customerName || t.walkInCustomer}</td>
                 <td>{s.itemCount}</td>
                 <td>{s.total.toFixed(2)} DZD</td>
                 <td>{s.paymentMethod}</td>
@@ -129,6 +157,7 @@ export default function Sales() {
 }
 
 function SaleModal({ sale, onClose }: { sale: Sale; onClose: () => void }) {
+  const { t } = useApp();
   const isCompleted =
     sale.status.toLowerCase() === "completed" ||
     sale.status.toLowerCase() === "paid";
@@ -164,15 +193,15 @@ function SaleModal({ sale, onClose }: { sale: Sale; onClose: () => void }) {
         <div className="px-6 py-4 grid grid-cols-2 gap-4 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm">
           <div className="rounded-xl bg-slate-50/60 p-3 border border-slate-100 dark:bg-slate-900/40 dark:border-slate-900">
             <span className="block text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-0.5">
-              Customer Profile
+              {t.customerProfile}
             </span>
             <span className="font-bold text-slate-800 dark:text-slate-200">
-              {sale.customerName || "Walk-in Customer"}
+              {sale.customerName || t.walkInCustomer}
             </span>
           </div>
           <div className="rounded-xl bg-slate-50/60 p-3 border border-slate-100 dark:bg-slate-900/40 dark:border-slate-900">
             <span className="block text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-0.5">
-              Assigned Cashier
+              {t.assignedCashier}
             </span>
             <span className="font-bold text-slate-800 dark:text-slate-200">
               {sale.cashierName}
@@ -184,10 +213,10 @@ function SaleModal({ sale, onClose }: { sale: Sale; onClose: () => void }) {
           <table className="w-full text-left text-sm border-collapse">
             <thead>
               <tr className="border-b border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-400 dark:border-slate-800">
-                <th className="pb-3 text-left">Product / Item</th>
-                <th className="pb-3 text-center w-16">Qty</th>
-                <th className="pb-3 text-right w-24">Unit Price</th>
-                <th className="pb-3 text-right w-28">Total</th>
+                <th className="pb-3 text-left">{t.productItem}</th>
+                <th className="pb-3 text-center w-16">{t.qty}</th>
+                <th className="pb-3 text-right w-24">{t.unitPrice}</th>
+                <th className="pb-3 text-right w-28">{t.total}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-900">
@@ -217,31 +246,31 @@ function SaleModal({ sale, onClose }: { sale: Sale; onClose: () => void }) {
         <div className="p-6 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800">
           <div className="w-full space-y-2.5 text-sm">
             <div className="flex justify-between text-slate-500 dark:text-slate-400">
-              <span>Subtotal</span>
+              <span>{t.subtotal}</span>
               <span className="font-semibold">
                 {sale.subtotal.toFixed(2)} DZD
               </span>
             </div>
             {sale.discount > 0 && (
               <div className="flex justify-between text-red-600 dark:text-red-400 font-medium">
-                <span>Discount</span>
+                <span>{t.discount}</span>
                 <span>-{sale.discount.toFixed(2)} DZD</span>
               </div>
             )}
             <div className="flex justify-between border-t border-dashed border-slate-200 dark:border-slate-800 pt-2.5 text-base font-black text-slate-900 dark:text-slate-50">
-              <span>Total</span>
+              <span>{t.total}</span>
               <span className="text-lg font-black text-blue-600 dark:text-blue-400">
                 {sale.total.toFixed(2)} DZD
               </span>
             </div>
             <div className="flex justify-between border-t border-slate-200/60 dark:border-slate-800 pt-2 text-slate-500 dark:text-slate-400 text-xs">
-              <span>Paid</span>
+              <span>{t.paidAmountShort}</span>
               <span className="font-medium text-slate-700 dark:text-slate-300">
                 {sale.paidAmount.toFixed(2)} DZD
               </span>
             </div>
             <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
-              <span>Change</span>
+              <span>{t.change}</span>
               <span
                 className={`font-bold ${sale.changeAmount > 0 ? "text-amber-600 dark:text-amber-400" : ""}`}
               >
@@ -256,10 +285,11 @@ function SaleModal({ sale, onClose }: { sale: Sale; onClose: () => void }) {
             className="btn-secondary w-full sm:w-auto h-10 px-6 font-bold shadow-sm transition-transform active:scale-[0.99]"
             onClick={onClose}
           >
-            Close
+            {t.close}
           </button>
         </div>
       </div>
     </div>
   );
 }
+

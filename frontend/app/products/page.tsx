@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { categories, products } from "@/lib/api";
+import { categories, products, settings } from "@/lib/api";
 import type { Category, Product } from "@/lib/types";
 import { useApp } from "@/components/Providers";
+import { useSearchParams } from "next/navigation";
 import {
   Plus,
   Pencil,
@@ -24,12 +25,14 @@ const empty = {
   isActive: true,
 };
 export default function ProductsPage() {
-  const { can } = useApp();
+  const { can, t } = useApp();
+  const searchParams = useSearchParams();
   const [items, setItems] = useState<Product[]>([]),
     [cats, setCats] = useState<Category[]>([]),
     [q, setQ] = useState(""),
     [cat, setCat] = useState(0),
-    [low, setLow] = useState(false),
+    [low, setLow] = useState(searchParams.get("lowStock") === "true"),
+    [lowStockThreshold, setLowStockThreshold] = useState(5), // fallback until settings load
     [edit, setEdit] = useState<Product | null>(null),
     [add, setAdd] = useState(false),
     [busy, setBusy] = useState(false),
@@ -38,7 +41,7 @@ export default function ProductsPage() {
   async function load() {
     setBusy(true);
     try {
-      const [r, c] = await Promise.all([
+      const [r, c, st] = await Promise.all([
         products.list({
           search: q,
           categoryId: cat || undefined,
@@ -46,9 +49,11 @@ export default function ProductsPage() {
           pageSize: 100,
         }),
         categories.list(),
+        settings.get(),
       ]);
       setItems(r.items);
       setCats(c);
+      setLowStockThreshold(st.lowStockThreshold);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Failed to load");
     } finally {
@@ -60,7 +65,7 @@ export default function ProductsPage() {
     load();
   }, [q, cat]);
 
-  const shown = low ? items.filter((p) => p.stock <= 5) : items;
+  const shown = low ? items.filter((p) => p.stock <= lowStockThreshold) : items;
 
   async function save(form: typeof empty) {
     try {
@@ -83,18 +88,18 @@ export default function ProductsPage() {
       alert(e instanceof Error ? e.message : "Delete failed");
     }
   }
-  
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap justify-between gap-3">
-          <h1 className="text-2xl font-bold">Products</h1>
+        <h1 className="text-2xl font-bold">{t.products}</h1>
         <div className="flex gap-2">
           <Link href="/categories" className="btn-secondary">
-            <Tags size={17} /> Manage categories
+            <Tags size={17} /> {t.manageCategories}
           </Link>
           {can("productWrite") && (
             <button className="btn-primary" onClick={() => setAdd(true)}>
-              <Plus size={17} /> Add product
+              <Plus size={17} /> {t.addProduct}
             </button>
           )}
         </div>
@@ -103,7 +108,7 @@ export default function ProductsPage() {
         <div className="relative flex-1 min-w-56">
           <input
             className="input pl-9"
-            placeholder="Search name or SKU"
+            placeholder={t.searchProductPlaceholder}
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
@@ -113,7 +118,7 @@ export default function ProductsPage() {
           value={cat}
           onChange={(e) => setCat(Number(e.target.value))}
         >
-          <option value={0}>All categories</option>
+          <option value={0}>{t.allCategories}</option>
           {cats.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
@@ -126,7 +131,7 @@ export default function ProductsPage() {
             checked={low}
             onChange={(e) => setLow(e.target.checked)}
           />{" "}
-          Low stock
+          {t.lowStock}
         </label>
         <button className="btn-secondary" onClick={load}>
           <RefreshCw size={16} />
@@ -142,14 +147,14 @@ export default function ProductsPage() {
           <table className="table">
             <thead>
               <tr>
-                <th>SKU</th>
-                <th>Name</th>
-                <th>Category</th>
-                <th>Price</th>
-                <th>Cost</th>
-                <th>Stock</th>
-                <th>Status</th>
-                {can("productWrite") && <th>Actions</th>}
+                <th>{t.sku}</th>
+                <th>{t.name}</th>
+                <th>{t.category}</th>
+                <th>{t.price}</th>
+                <th>{t.cost}</th>
+                <th>{t.stock}</th>
+                <th>{t.status}</th>
+                {can("productWrite") && <th>{t.actions}</th>}
               </tr>
             </thead>
             <tbody>
@@ -232,6 +237,7 @@ function ProductModal({
   onClose: () => void;
   onSave: (f: typeof empty) => void;
 }) {
+  const { t } = useApp();
   const [f, setF] = useState(
     product
       ? {
@@ -245,38 +251,38 @@ function ProductModal({
         }
       : empty,
   );
-  
+
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">
       <div className="card w-full max-w-lg p-6">
         <h2 className="text-lg font-bold">
-          {product ? "Edit product" : "Add product"}
+          {product ? t.editProduct : t.addProduct}
         </h2>
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium">
-              SKU
-            </label>
+            <label className="mb-1 block text-sm font-medium">{t.sku}</label>
             <input
               className="input"
-              placeholder="SKU"
+              placeholder={t.sku}
               value={f.sku}
               onChange={(e) => setF({ ...f, sku: e.target.value })}
             />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">
-              Product Name
+              {t.productName}
             </label>
             <input
               className="input"
-              placeholder="Name"
+              placeholder={t.name}
               value={f.name}
               onChange={(e) => setF({ ...f, name: e.target.value })}
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Category</label>
+            <label className="mb-1 block text-sm font-medium">
+              {t.category}
+            </label>
             <select
               className="input"
               value={f.categoryId}
@@ -284,7 +290,7 @@ function ProductModal({
                 setF({ ...f, categoryId: Number(e.target.value) })
               }
             >
-              <option value={0}>Select category</option>
+              <option value={0}>{t.selectCategory}</option>
               {categories
                 .filter((c) => c.isActive)
                 .map((c) => (
@@ -296,41 +302,41 @@ function ProductModal({
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">
-              Selling Price (DZD)
+              {t.sellingPrice}
             </label>
             <input
               className="input"
               type="number"
               min="0"
               step="0.01"
-              placeholder="Price"
+              placeholder={t.price}
               value={f.price}
               onChange={(e) => setF({ ...f, price: Number(e.target.value) })}
             />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">
-              Cost Price (DZD)
+              {t.costPrice}
             </label>
             <input
               className="input"
               type="number"
               min="0"
               step="0.01"
-              placeholder="Cost"
+              placeholder={t.cost}
               value={f.cost}
               onChange={(e) => setF({ ...f, cost: Number(e.target.value) })}
             />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">
-              Initial Stock Qty
+              {t.initialStock}
             </label>
             <input
               className="input"
               type="number"
               min="0"
-              placeholder="Stock"
+              placeholder={t.stock}
               value={f.stock}
               onChange={(e) => setF({ ...f, stock: Number(e.target.value) })}
             />
@@ -342,21 +348,22 @@ function ProductModal({
             checked={f.isActive}
             onChange={(e) => setF({ ...f, isActive: e.target.checked })}
           />{" "}
-          Active
+          {t.active}
         </label>
         <div className="mt-6 flex justify-end gap-2">
           <button className="btn-secondary" onClick={onClose}>
-            Cancel
+            {t.cancel}
           </button>
           <button
             className="btn-primary"
             disabled={!f.sku || !f.name || !f.categoryId}
             onClick={() => onSave(f)}
           >
-            Save
+            {t.save}
           </button>
         </div>
       </div>
     </div>
   );
 }
+
