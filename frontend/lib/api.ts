@@ -31,32 +31,63 @@ export function clearAuth() {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
+
   const headers = new Headers(options.headers);
-  if (options.body && !headers.has("Content-Type"))
+
+  if (options.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-  const r = await fetch(`${API_URL}${path}`, {
+  }
+
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const url = `${API_URL}${path}`;
+
+  console.log("API REQUEST:", {
+    method: options.method || "GET",
+    url,
+    path,
+    hasToken: !!token,
+  });
+
+  const r = await fetch(url, {
     ...options,
     headers,
     cache: "no-store",
   });
+
+  console.log("API RESPONSE:", {
+    status: r.status,
+    url,
+  });
+
   if (r.status === 401) {
     clearAuth();
+
     if (
       typeof window !== "undefined" &&
       !location.pathname.startsWith("/login")
-    )
+    ) {
       location.href = "/login";
+    }
   }
+
   if (!r.ok) {
     let msg = `Request failed (${r.status})`;
+
     try {
       const d = await r.json();
-      msg = d.error || d.title || msg;
+      msg = d.error || d.title || d.message || msg;
     } catch {}
-    throw new Error(msg);
+
+    throw new Error(`${msg} | ${options.method || "GET"} ${url}`);
   }
-  if (r.status === 204) return undefined as T;
+
+  if (r.status === 204) {
+    return undefined as T;
+  }
+
   return r.json();
 }
 
@@ -221,5 +252,71 @@ export const settings = {
     request<Settings>("/settings", {
       method: "PUT",
       body: JSON.stringify(data),
+    }),
+};
+
+export const ai = {
+  parseSale: (text: string) =>
+    request<{
+      items: {
+        productId: number;
+        sku: string;
+        name: string;
+        quantity: number;
+        availableStock: number;
+        insufficientStock: boolean;
+      }[];
+      unmatched: string[];
+      stockWarnings: string[];
+    }>("/ai/parse-sale", {
+      method: "POST",
+      body: JSON.stringify({ text }),
+    }),
+
+  assistant: (text: string) =>
+    request<{
+      intent: string;
+      message: string;
+
+      requiresConfirmation: boolean;
+
+      saleCreated: boolean;
+
+      saleId?: number;
+
+      saleNumber?: string;
+
+      preview?: {
+        customerId?: number;
+        customerName?: string;
+
+        paymentMethod: string;
+
+        subtotal: number;
+        discount: number;
+        total: number;
+
+        paidAmount: number;
+        changeAmount: number;
+
+        items: {
+          productId: number;
+          sku: string;
+          name: string;
+          quantity: number;
+          unitPrice: number;
+          lineTotal: number;
+
+          availableStock: number;
+          insufficientStock: boolean;
+        }[];
+      };
+
+      unmatched: string[];
+
+      warnings: string[];
+    }>("/ai/assistant", {
+      method: "POST",
+      body: JSON.stringify({ text }),
     }),
 };

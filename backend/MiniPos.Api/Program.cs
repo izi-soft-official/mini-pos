@@ -58,6 +58,11 @@ builder.Services.AddCors(options =>
         .AllowAnyHeader()
         .AllowAnyMethod()));
 
+builder.Services.AddHttpClient("ai-service", client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["AiService:Url"]!);
+});
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())

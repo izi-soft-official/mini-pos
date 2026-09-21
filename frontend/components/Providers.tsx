@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { auth, clearAuth, settings } from "@/lib/api";
 import type { User } from "@/lib/types";
 import { getTranslation } from "@/lib/dictionaries";
+import AiAssistant from "@/components/AiAssistant";
 
 type Ctx = {
   user: User | null;
@@ -99,6 +100,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       value={{ user, loading, login, logout, can, lang, setLang, t }}
     >
       {children}
+      <AiAssistant />
     </AppContext.Provider>
   );
 }
