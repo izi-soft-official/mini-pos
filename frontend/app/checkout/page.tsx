@@ -1,361 +1,334 @@
-// app/checkout/page.tsx
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { customers, products, sales } from "@/lib/api";
+import type { Customer, Product } from "@/lib/types";
+import { useApp } from "@/components/Providers";
 import {
-  getProducts,
-  searchProducts,
-  addSale,
-  type Product,
-  type PaymentMethod,
-} from "@/lib/db";
+  Search,
+  Plus,
+  Trash2,
+  Minus,
+  Package,
+  ShoppingCart,
+} from "@/components/Icons";
 
-interface CartLine {
-  productId: string;
-  name: string;
-  unitPrice: number;
-  quantity: number;
-}
+type Cart = { product: Product; qty: number };
 
-export default function CheckoutPage() {
-  const [productList, setProductList] = useState<Product[]>(() => getProducts());
-  const [query, setQuery] = useState("");
-  const [cart, setCart] = useState<CartLine[]>([]);
-  const [discount, setDiscount] = useState("0");
-  const [paid, setPaid] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
-  const [stockErrors, setStockErrors] = useState<Record<string, string>>({});
+export default function Checkout() {
+  const { t } = useApp();
+  const [items, setItems] = useState<Product[]>([]),
+    [custs, setCusts] = useState<Customer[]>([]),
+    [q, setQ] = useState(""),
+    [cart, setCart] = useState<Cart[]>([]),
+    [customerId, setCustomerId] = useState(0),
+    [paid, setPaid] = useState(0),
+    [method, setMethod] = useState("Cash"),
+    [discount, setDiscount] = useState(0),
+    [busy, setBusy] = useState(false);
 
-  const filteredProducts = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return productList;
-    return productList.filter(
-      (p) => p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)
-    );
-  }, [query, productList]);
+  useEffect(() => {
+    products
+      .list({ activeOnly: true, pageSize: 100 })
+      .then((r) => setItems(r.items))
+      .catch((e) => alert(e.message));
+    customers
+      .list()
+      .then((r) => setCusts(r.items))
+      .catch((e) => alert(e.message));
+  }, []);
 
-  function addToCart(product: Product) {
-    setCart((prev) => {
-      const existing = prev.find((l) => l.productId === product.id);
-      if (existing) {
-        return prev.map((l) =>
-          l.productId === product.id ? { ...l, quantity: l.quantity + 1 } : l
+  const shown = items.filter((p) =>
+    `${p.name} ${p.sku}`.toLowerCase().includes(q.toLowerCase()),
+  );
+
+  const subtotal = useMemo(
+    () => cart.reduce((a, x) => a + x.qty * x.product.price, 0),
+    [cart],
+  );
+
+  const total = Math.max(0, subtotal - discount);
+
+  const change = Math.max(0, paid - total);
+
+  function add(p: Product) {
+    setCart((c) => {
+      const old = c.find((x) => x.product.id === p.id);
+      if (old) {
+        if (old.qty >= p.stock) return c;
+        return c.map((x) =>
+          x.product.id === p.id ? { ...x, qty: x.qty + 1 } : x,
         );
       }
-      return [
-        ...prev,
-        { productId: product.id, name: product.name, unitPrice: product.price, quantity: 1 },
-      ];
+      return [...c, { product: p, qty: 1 }];
     });
   }
 
-  function updateQuantity(productId: string, quantity: number) {
-    if (quantity <= 0) {
-      setCart((prev) => prev.filter((l) => l.productId !== productId));
-      return;
-    }
-    setCart((prev) =>
-      prev.map((l) => (l.productId === productId ? { ...l, quantity } : l))
+  function changeQty(id: number, d: number) {
+    setCart((c) =>
+      c
+        .map((x) =>
+          x.product.id === id
+            ? { ...x, qty: Math.max(0, Math.min(x.product.stock, x.qty + d)) }
+            : x,
+        )
+        .filter((x) => x.qty > 0),
     );
-
-    setStockErrors((prev) => {
-      const next = { ...prev };
-      delete next[productId];
-      return next;
-    });
   }
 
-  function removeLine(productId: string) {
-    setCart((prev) => prev.filter((l) => l.productId !== productId));
-  }
-
-  const subtotal = cart.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0);
-  const discountAmount = parseFloat(discount) || 0;
-  const total = Math.max(subtotal - discountAmount, 0);
-  const paidAmount = parseFloat(paid) || 0;
-  const changeAmount = paidAmount - total;
-
-  const canPay = cart.length > 0 && paidAmount >= total && paymentMethod !== null;
-
-  function validateStock(): Record<string, string> {
-    const errors: Record<string, string> = {};
-    for (const line of cart) {
-      const product = productList.find((p) => p.id === line.productId);
-      if (!product) {
-        errors[line.productId] = "Product no longer exists.";
-        continue;
-      }
-      if (line.quantity > product.stock) {
-        errors[line.productId] = `Only ${product.stock} left in stock (requested ${line.quantity}).`;
-      }
+  async function confirm() {
+    if (!cart.length) return alert(t.cartIsEmpty);
+    if (paid < total) return alert(t.paidAmountLess);
+    setBusy(true);
+    try {
+      await sales.create({
+        customerId: customerId || null,
+        paymentMethod: method,
+        discount,
+        paidAmount: paid,
+        items: cart.map((x) => ({
+          productId: x.product.id,
+          quantity: x.qty,
+          unitPrice: x.product.price,
+        })),
+      });
+      alert(t.saleCompleted);
+      setCart([]);
+      setPaid(0);
+      setDiscount(0);
+      const r = await products.list({ activeOnly: true, pageSize: 100 });
+      setItems(r.items);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Sale failed");
+    } finally {
+      setBusy(false);
     }
-    return errors;
-  }
-
-  function completeSale() {
-    if (!canPay || !paymentMethod) return;
-
-    const errors = validateStock();
-    if (Object.keys(errors).length > 0) {
-      setStockErrors(errors);
-      return;
-    }
-
-    setStockErrors({});
-
-    addSale({
-      number: `S-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      lines: cart.map((l) => ({
-        productId: l.productId,
-        productName: l.name,
-        quantity: l.quantity,
-        unitPrice: l.unitPrice,
-        lineTotal: l.unitPrice * l.quantity,
-      })),
-      subtotal,
-      discount: discountAmount,
-      total,
-      paidAmount,
-      changeAmount,
-      paymentMethod,
-      status: "completed",
-    });
-
-    // refresh local product list so updated stock shows in the table
-    setProductList(searchProducts(""));
-
-    setCart([]);
-    setDiscount("0");
-    setPaid("");
-    setPaymentMethod(null);
   }
 
   return (
-    <>
-      <h1 className="text-xl font-semibold text-gray-900 mb-4">Checkout</h1>
-
-      <div className="bg-white border border-gray-300 rounded p-4">
-        <input
-          className="mb-4 px-2.5 py-2 border border-gray-300 rounded w-full max-w-xs text-sm focus:outline-none focus:border-blue-600"
-          type="text"
-          placeholder="Search products by name or category..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr>
-              <th className="text-left px-2.5 py-2 border-b border-gray-300 text-gray-500 font-semibold text-xs uppercase tracking-wide">
-                Sku
-              </th>
-              <th className="text-left px-2.5 py-2 border-b border-gray-300 text-gray-500 font-semibold text-xs uppercase tracking-wide">
-                Product Name
-              </th>
-              <th className="text-left px-2.5 py-2 border-b border-gray-300 text-gray-500 font-semibold text-xs uppercase tracking-wide">
-                Category
-              </th>
-              <th className="text-right px-2.5 py-2 border-b border-gray-300 text-gray-500 font-semibold text-xs uppercase tracking-wide">
-                Price
-              </th>
-              <th className="text-right px-2.5 py-2 border-b border-gray-300 text-gray-500 font-semibold text-xs uppercase tracking-wide">
-                Stock
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredProducts.map((p) => (
-              <tr key={p.id}>
-                <td className="px-2.5 py-2 border-b border-gray-300 align-middle">{p.sku}</td>
-                <td className="px-2.5 py-2 border-b border-gray-300 align-middle">
-                  <button
-                    className="bg-transparent border-none p-0 text-blue-600 no-underline cursor-pointer text-sm hover:text-blue-900 disabled:text-gray-500 disabled:no-underline disabled:cursor-not-allowed"
-                    onClick={() => addToCart(p)}
-                    disabled={p.stock === 0}
-                  >
-                    {p.name}
-                  </button>
-                </td>
-                <td className="px-2.5 py-2 border-b border-gray-300 align-middle">{p.category}</td>
-                <td className="px-2.5 py-2 border-b border-gray-300 align-middle text-right">
-                  {p.price.toFixed(2)}
-                </td>
-                <td className="px-2.5 py-2 border-b border-gray-300 align-middle text-right">
-                  {p.stock}
-                </td>
-              </tr>
+    <div className="grid gap-5 lg:grid-cols-[1fr_420px]">
+      <section className="space-y-4">
+        <h1 className="text-2xl font-bold">{t.checkout}</h1>
+        <div className="card p-4">
+          <div className="relative">
+            <input
+              className="input pl-9"
+              placeholder={t.searchProducts}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {shown.map((p) => (
+              <button
+                key={p.id}
+                disabled={p.stock <= 0}
+                onClick={() => add(p)}
+                className="rounded-xl border p-4 text-left hover:border-blue-500 disabled:opacity-40"
+              >
+                <div className="font-semibold">{p.name}</div>
+                <div className="text-xs text-slate-500">{p.sku}</div>
+                <div className="mt-2 flex justify-between">
+                  <b>{p.price.toFixed(2)} DZD</b>
+                  <span className="text-xs">
+                    {t.stock}: {p.stock}
+                  </span>
+                </div>
+              </button>
             ))}
-            {filteredProducts.length === 0 && (
-              <tr>
-                <td className="text-center text-gray-500 py-6" colSpan={5}>
-                  No products match "{query}".
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="mt-6 flex gap-6 items-start flex-wrap">
-        <div className="flex-1 basis-120 bg-white border border-gray-300 rounded p-4">
-          <h2 className="text-base font-semibold mb-3">Cart</h2>
-          {cart.length === 0 ? (
-            <p className="text-gray-500 text-sm py-6 text-center">
-              No items yet — click a product name to add it.
-            </p>
-          ) : (
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr>
-                  <th className="text-left px-2.5 py-2 border-b border-gray-300 text-gray-500 font-semibold text-xs uppercase tracking-wide">
-                    Item
-                  </th>
-                  <th className="text-right px-2.5 py-2 border-b border-gray-300 text-gray-500 font-semibold text-xs uppercase tracking-wide">
-                    Qty
-                  </th>
-                  <th className="text-right px-2.5 py-2 border-b border-gray-300 text-gray-500 font-semibold text-xs uppercase tracking-wide">
-                    Unit
-                  </th>
-                  <th className="text-right px-2.5 py-2 border-b border-gray-300 text-gray-500 font-semibold text-xs uppercase tracking-wide">
-                    Total
-                  </th>
-                  <th className="border-b border-gray-300"></th>
-                  <th className="border-b border-gray-300"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {cart.map((l) => (
-                  <tr key={l.productId}>
-                    <td className="px-2.5 py-2 border-b border-gray-300 align-middle font-medium">
-                      {l.name}
-                    </td>
-                    <td className="px-2.5 py-2 border-b border-gray-300 align-middle text-right">
-                      <input
-                        className="w-14 px-1.5 py-1 border border-gray-300 rounded text-xs text-center"
-                        type="number"
-                        min={0}
-                        value={l.quantity}
-                        onChange={(e) =>
-                          updateQuantity(l.productId, parseInt(e.target.value, 10) || 0)
-                        }
-                      />
-                      {stockErrors[l.productId] && (
-                        <div className="text-red-700 text-[11px] mt-1">
-                          {stockErrors[l.productId]}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-2.5 py-2 border-b border-gray-300 align-middle text-right">
-                      {l.unitPrice.toFixed(2)}
-                    </td>
-                    <td className="px-2.5 py-2 border-b border-gray-300 align-middle text-right">
-                      {(l.unitPrice * l.quantity).toFixed(2)}
-                    </td>
-                    <td className="px-2.5 py-2 border-b border-gray-300 align-middle">
-                      <button
-                        className="px-2.5 py-1 border border-gray-300 rounded bg-white text-gray-500 text-xs hover:border-blue-600 hover:text-blue-600"
-                        onClick={() => updateQuantity(l.productId, l.quantity + 1)}
-                      >
-                        Add
-                      </button>
-                    </td>
-                    <td className="px-2.5 py-2 border-b border-gray-300 align-middle">
-                      <button
-                        className="px-2.5 py-1 border border-gray-300 rounded bg-white text-gray-500 text-xs hover:border-blue-600 hover:text-blue-600"
-                        onClick={() => removeLine(l.productId)}
-                      >
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          </div>
+        </div>
+      </section>
+      <aside className="card flex flex-col p-5 h-fit lg:sticky lg:top-5 shadow-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950">
+        <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-slate-800">
+          <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <ShoppingCart size={19} className="text-blue-600" />
+            {t.cartBasket}
+          </h2>
+          {cart.length > 0 && (
+            <span className="badge bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 font-bold px-2.5 py-0.5">
+              {cart.reduce((acc, item) => acc + item.qty, 0)} {t.cartItemsCount}
+            </span>
           )}
         </div>
 
-        <div className="flex-none basis-75 bg-white border border-gray-300 rounded p-4">
-          <div className="flex flex-col gap-2">
-            <div className="flex justify-between items-center text-sm text-gray-500">
-              <span>Subtotal</span>
-              <span>{subtotal.toFixed(2)}</span>
+        <div className="mt-4 space-y-3 max-h-[320px] overflow-y-auto pr-1 scrollbar-thin">
+          {cart.map((x) => (
+            <div
+              key={x.product.id}
+              className="group rounded-xl border border-slate-100 bg-slate-50/50 p-3 transition hover:border-slate-200 dark:border-slate-800 dark:bg-slate-900/40 dark:hover:border-slate-700"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex flex-col">
+                  <span className="font-semibold text-sm text-slate-800 dark:text-slate-200 leading-tight">
+                    {x.product.name}
+                  </span>
+                  <span className="text-xs text-slate-400 mt-1">
+                    {x.product.price.toFixed(2)} {t.each}
+                  </span>
+                </div>
+                <span className="font-bold text-sm text-slate-900 dark:text-slate-100 whitespace-nowrap">
+                  {(x.qty * x.product.price).toFixed(2)}
+                </span>
+              </div>
+
+              <div className="mt-3 flex items-center gap-2 border-t border-slate-100 pt-2 dark:border-slate-800">
+                <div className="flex items-center rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 overflow-hidden h-8">
+                  <button
+                    className="px-2.5 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+                    onClick={() => changeQty(x.product.id, -1)}
+                  >
+                    <Minus size={12} />
+                  </button>
+                  <span className="px-2 text-sm font-bold min-w-8 text-center text-slate-800 dark:text-slate-200">
+                    {x.qty}
+                  </span>
+                  <button
+                    className="px-2.5 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition"
+                    onClick={() => changeQty(x.product.id, 1)}
+                  >
+                    <Plus size={12} />
+                  </button>
+                </div>
+
+                <button
+                  className="btn-danger ml-auto h-8 w-8 !p-0 rounded-lg flex items-center justify-center opacity-80 hover:opacity-100 transition"
+                  onClick={() =>
+                    setCart((c) =>
+                      c.filter((y) => y.product.id !== x.product.id),
+                    )
+                  }
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
             </div>
-            <div className="flex justify-between items-center text-sm text-gray-500">
-              <span>Discount</span>
-              <input
-                className="w-24 text-right px-1.5 py-1.5 border border-gray-300 rounded text-sm"
-                type="number"
-                min={0}
-                step="0.01"
-                value={discount}
-                onChange={(e) => setDiscount(e.target.value)}
-              />
+          ))}
+
+          {!cart.length && (
+            <div className="py-8 text-center flex flex-col items-center justify-center text-slate-400 dark:text-slate-600">
+              <Package size={26} className="mb-2 stroke-1" />
+              <p className="text-xs">{t.noItemsBasket}</p>
             </div>
-            <div className="flex justify-between items-center text-[15px] font-semibold text-gray-900 pt-2 mt-1 border-t border-gray-300">
-              <span>Total</span>
-              <span>{total.toFixed(2)}</span>
+          )}
+        </div>
+
+        <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3.5">
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">
+              {t.customer}
+            </label>
+            <select
+              className="input h-10"
+              value={customerId}
+              onChange={(e) => setCustomerId(Number(e.target.value))}
+            >
+              <option value={0}>{t.walkInCustomer}</option>
+
+              {custs.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.fullName} · {c.phone}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">
+                {t.paymentMethod}
+              </label>
+              <select
+                className="input h-10"
+                value={method}
+                onChange={(e) => setMethod(e.target.value)}
+              >
+                <option value="Cash">{t.cash}</option>
+                <option value="Card">{t.card}</option>
+                <option value="IZI Pay">{t.iziPay}</option>
+              </select>
             </div>
-            <div className="flex justify-between items-center text-sm text-gray-500">
-              <span>Paid</span>
-              <input
-                className="w-24 text-right px-1.5 py-1.5 border border-gray-300 rounded text-sm"
-                type="number"
-                min={0}
-                step="0.01"
-                value={paid}
-                onChange={(e) => setPaid(e.target.value)}
-              />
-            </div>
-            <div className="flex justify-between items-center text-sm text-gray-500">
-              <span>Change</span>
-              <span>{changeAmount >= 0 ? changeAmount.toFixed(2) : "0.00"}</span>
+
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">
+                {t.discount}
+              </label>
+              <div className="relative">
+                <input
+                  className="input h-10 pr-10 font-medium"
+                  type="number"
+                  min="0"
+                  placeholder="0.00"
+                  value={discount || ""}
+                  onChange={(e) => setDiscount(Number(e.target.value))}
+                />
+                <span className="absolute right-3 top-2.5 text-xs font-bold text-slate-400">
+                  DZD
+                </span>
+              </div>
             </div>
           </div>
 
-          <div className="mt-4 flex gap-2">
-            <button
-              className={
-                paymentMethod === "cash"
-                  ? "flex-1 py-2 border border-blue-600 rounded bg-blue-600 text-white text-xs font-semibold"
-                  : "flex-1 py-2 border border-gray-300 rounded bg-white text-gray-900 text-xs hover:border-blue-600 hover:text-blue-600"
-              }
-              onClick={() => setPaymentMethod("cash")}
-            >
-              Cash
-            </button>
-            <button
-              className={
-                paymentMethod === "card"
-                  ? "flex-1 py-2 border border-blue-600 rounded bg-blue-600 text-white text-xs font-semibold"
-                  : "flex-1 py-2 border border-gray-300 rounded bg-white text-gray-900 text-xs hover:border-blue-600 hover:text-blue-600"
-              }
-              onClick={() => setPaymentMethod("card")}
-            >
-              Card
-            </button>
-            <button
-              className={
-                paymentMethod === "izipay"
-                  ? "flex-1 py-2 border border-blue-600 rounded bg-blue-600 text-white text-xs font-semibold"
-                  : "flex-1 py-2 border border-gray-300 rounded bg-white text-gray-900 text-xs hover:border-blue-600 hover:text-blue-600"
-              }
-              onClick={() => setPaymentMethod("izipay")}
-            >
-              Izi Pay
-            </button>
-          </div>
-
-          <div className="mt-4">
-            <button
-              className="w-full py-2.5 bg-blue-600 text-white border-none rounded text-sm font-semibold hover:bg-blue-900 disabled:bg-gray-500 disabled:cursor-not-allowed"
-              onClick={completeSale}
-              disabled={!canPay}
-            >
-              Pay
-            </button>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">
+              {t.paidAmount}
+            </label>
+            <div className="relative">
+              <input
+                className={`input h-11 pr-12 text-base font-bold transition-colors ${paid >= total && cart.length ? "focus:border-emerald-500 border-emerald-200 bg-emerald-50/10 dark:border-emerald-900/30" : ""}`}
+                type="number"
+                min="0"
+                placeholder="0.00"
+                value={paid || ""}
+                onChange={(e) => setPaid(Number(e.target.value))}
+              />
+              <span className="absolute right-3 top-3 text-xs font-bold text-slate-400">
+                DZD
+              </span>
+            </div>
           </div>
         </div>
-      </div>
-    </>
+
+        <div className="mt-5 space-y-2.5 rounded-xl bg-slate-50 p-4 dark:bg-slate-900/60 text-sm border border-slate-100 dark:border-slate-900">
+          <div className="flex justify-between text-slate-500 dark:text-slate-400">
+            <span>{t.subtotal}</span>
+            <span className="font-semibold">{subtotal.toFixed(2)} DZD</span>
+          </div>
+          <div className="flex justify-between text-red-600 dark:text-red-400">
+            <span>{t.discount}</span>
+            <span className="font-semibold">-{discount.toFixed(2)} DZD</span>
+          </div>
+          <div className="flex justify-between border-t border-dashed border-slate-200 dark:border-slate-800 pt-2.5 text-base font-black text-slate-900 dark:text-slate-50">
+            <span>{t.totalToPay}</span>
+            <span className="text-lg text-blue-600 dark:text-blue-400">
+              {total.toFixed(2)} DZD
+            </span>
+          </div>
+          <div className="flex justify-between border-t border-slate-200/60 dark:border-slate-800 pt-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+            <span>{t.changeReturn}</span>
+            <span
+              className={`font-bold ${change > 0 ? "text-amber-600 dark:text-amber-400 text-sm" : ""}`}
+            >
+              {change.toFixed(2)} DZD
+            </span>
+          </div>
+        </div>
+
+        <button
+          className={`btn-primary mt-5 w-full h-11 text-base font-bold shadow-sm transition-transform active:scale-[0.99] ${paid < total && cart.length ? "!bg-slate-200 dark:!bg-slate-800 !text-slate-400 dark:!text-slate-500 cursor-not-allowed border-none shadow-none" : ""}`}
+          disabled={busy || !cart.length || paid < total}
+          onClick={confirm}
+        >
+          {busy ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              {t.processing}
+            </span>
+          ) : (
+            t.confirmSale
+          )}
+        </button>
+      </aside>
+    </div>
   );
 }

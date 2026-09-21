@@ -1,51 +1,96 @@
-import { Moon, Sun, LogOut } from "@/components/Icons";
+"use client";
+
+import { useEffect, useState } from "react";
+import { settings } from "@/lib/api";
+import type { Settings } from "@/lib/types";
+import { useApp } from "@/components/Providers";
 
 export default function SettingsPage() {
-  return (
-    <>
-      <div>
-        <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="text-sm text-slate-500">
-          Application preferences and account.
-        </p>
+  const { user, t, setLang } = useApp(); //Access translation dictionary 't' and setLang handler
+  const [s, setS] = useState<Settings>({
+    language: "en",
+    theme: "light",
+    lowStockThreshold: 5,
+  });
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    settings
+      .get()
+      .then((r) => {
+        setS(r);
+        setLang(r.language); //Update global language state on load
+        document.documentElement.classList.toggle("dark", r.theme === "dark");
+      })
+      .catch((e) => setErr(e.message));
+  }, []);
+
+  async function save() {
+    try {
+      const r = await settings.update(s);
+      setS(r);
+      setLang(r.language); //Update global language state on save
+      document.documentElement.classList.toggle("dark", r.theme === "dark");
+      alert("Settings saved");
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Settings API unavailable");
+    }
+  }
+
+  if (err)
+    return (
+      <div className="card p-8">
+        <h1 className="text-xl font-bold">Settings API unavailable</h1>
+        <p className="mt-2 text-sm text-slate-500">{err}</p>
       </div>
-      <div className="bg-white border border-gray-300 rounded overflow-hidden">
-        <div className="card p-6">
-          <h2 className="font-bold">Language</h2>
-          <select className="input mt-4 max-w-xs">
+    );
+
+  return (
+    <div className="space-y-5">
+      <h1 className="text-2xl font-bold">{t.settings}</h1>
+      <div className="card max-w-xl p-6 space-y-5">
+        <div>
+          <label className="mb-1 block text-sm font-medium">{t.language}</label>
+          <select
+            className="input"
+            value={s.language}
+            onChange={(e) => setS({ ...s, language: e.target.value })}
+          >
             <option value="en">English</option>
             <option value="fr">Français</option>
-            <option value="ar">العربية</option>
           </select>
         </div>
-
-        <div className="card p-6">
-          <h2 className="font-bold">Appearance</h2>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <button className={`rounded-2xl border p-4 text-left `}>
-              <Sun className="mb-2" />
-              <b>Light</b>
-              <p className="text-xs text-slate-500">Bright interface</p>
-            </button>
-            <button className={`rounded-2xl border p-4 text-left }`}>
-              <Moon className="mb-2" />
-              <b>Dark</b>
-              <p className="text-xs text-slate-500">Dark interface</p>
-            </button>
-          </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium">{t.theme}</label>
+          <select
+            className="input"
+            value={s.theme}
+            onChange={(e) => setS({ ...s, theme: e.target.value })}
+          >
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
         </div>
-
-        <div className="card p-6">
-          <h2 className="font-bold">Account</h2>
-          <div className="mt-4 rounded-xl bg-slate-50 p-4 dark:bg-slate-800">
-            <div className="font-semibold">User Name</div>
-            <div className="text-sm capitalize text-slate-500">User Role</div>
-          </div>
-          <button className="px-2.5 py-1 border border-gray-300 rounded-xl bg-white text-red-700 hover:border-red-700 mt-4">
-            <LogOut size={16} /> Log out
+        <div>
+          <label className="mb-1 block text-sm font-medium">
+            {t.lowStockThreshold}
+          </label>
+          <input
+            className="input"
+            type="number"
+            min="0"
+            value={s.lowStockThreshold}
+            onChange={(e) =>
+              setS({ ...s, lowStockThreshold: Number(e.target.value) })
+            }
+          />
+        </div>
+        {user?.role === "Admin" && (
+          <button className="btn-primary" onClick={save}>
+            {t.saveSettings}
           </button>
-        </div>
+        )}
       </div>
-    </>
+    </div>
   );
 }

@@ -1,120 +1,53 @@
-@import "tailwindcss";
-
-:root {
-  --border: #d9d9d9;
-  --muted: #666666;
-  --accent: #12508a;
-}
-
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 * {
   box-sizing: border-box;
 }
-
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
-  color: #1a1a1a;
-  background: #f6f6f6;
+  font-family: Arial, Helvetica, sans-serif;
+  color: #0f172a;
 }
-
-.nav {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 16px;
-  padding: 12px 24px;
-  background: #ffffff;
-  border-bottom: 1px solid var(--border);
+.dark body {
+  color: #e2e8f0;
 }
-
-.nav-brand {
-  font-weight: 600;
-  margin-right: 8px;
+.card {
+  @apply rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950;
 }
-
-.nav-link {
-  color: var(--muted);
-  text-decoration: none;
-  font-size: 14px;
+.input {
+  @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900;
 }
-
-.nav-link:hover {
-  color: var(--accent);
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition;
 }
-
-.nav-link-active {
-  color: var(--accent);
-  font-weight: 600;
+.btn-primary {
+  @apply btn bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50;
 }
-
-.page {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 24px;
+.btn-secondary {
+  @apply btn border border-slate-300 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800;
 }
-
-.page h1 {
-  font-size: 22px;
-  margin: 0 0 16px;
+.btn-danger {
+  @apply btn bg-red-600 text-white hover:bg-red-700;
 }
-
-.panel {
-  background: #ffffff;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  min-height: 240px;
-  padding: 16px;
+.badge {
+  @apply inline-flex rounded-full px-2.5 py-1 text-xs font-semibold;
 }
-
-.form {
-  background: #ffffff;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  max-width: 360px;
-  min-height: 200px;
-  padding: 16px;
+.navlink {
+  @apply flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800;
 }
-
+.navlink.active {
+  @apply bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300;
+}
 .table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
+  @apply w-full text-left text-sm;
 }
-
 .table th {
-  text-align: left;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
-  color: var(--muted);
-  font-weight: 600;
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+  @apply bg-slate-50 p-3 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-900;
 }
-
 .table td {
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
-  color: #1a1a1a;
+  @apply border-t border-slate-100 p-3 dark:border-slate-800;
 }
-
-.table tbody tr:hover {
-  background: #fafafa;
-}
-
-.table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-/* right-align numeric columns like price, qty, total */
-.table td.numeric,
-.table th.numeric {
-  text-align: right;
-}
-
-/* empty-state row, e.g. "No products match..." */
-.table td.empty {
-  text-align: center;
-  color: var(--muted);
-  padding: 24px 12px;
+.stat {
+  @apply card p-5;
 }
