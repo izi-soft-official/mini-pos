@@ -21,6 +21,10 @@ import {
 type Message = {
   role: "user" | "assistant";
   text: string;
+  warnings?: string[];
+  product?: ProductInfo;
+  products?: ProductInfo[];
+  productListKind?: "products" | "low_stock";
 };
 
 type Preview = {
@@ -42,6 +46,16 @@ type Preview = {
     availableStock: number;
     insufficientStock: boolean;
   }[];
+};
+
+type ProductInfo = {
+  id: number;
+  sku: string;
+  name: string;
+  category: string;
+  price: number;
+  stock: number;
+  isActive: boolean;
 };
 
 export default function AiAssistant() {
@@ -98,17 +112,20 @@ export default function AiAssistant() {
           response.unmatched.map((item) => `• ${item}`).join("\n");
       }
 
-      if (response.warnings?.length) {
-        assistantMessage +=
-          "\n\nWarnings:\n" +
-          response.warnings.map((item) => `• ${item}`).join("\n");
-      }
-
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
           text: assistantMessage,
+          warnings: response.warnings ?? [],
+          product: response.product,
+          products: response.products,
+          productListKind:
+            response.intent === "low_stock"
+              ? "low_stock"
+              : response.products?.length
+                ? "products"
+                : undefined,
         },
       ]);
 
@@ -133,9 +150,7 @@ export default function AiAssistant() {
     }
   }
 
-  function handleKeyDown(
-    event: React.KeyboardEvent<HTMLInputElement>
-  ) {
+  function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Enter") {
       event.preventDefault();
       sendMessage();
@@ -233,9 +248,7 @@ export default function AiAssistant() {
               </div>
 
               <div>
-                <h2 className="font-bold text-slate-900">
-                  AI Assistant
-                </h2>
+                <h2 className="font-bold text-slate-900">AI Assistant</h2>
 
                 <div className="mt-0.5 flex items-center gap-1.5">
                   <Circle
@@ -244,9 +257,7 @@ export default function AiAssistant() {
                     className="text-emerald-500"
                   />
 
-                  <p className="text-xs text-slate-500">
-                    POS Assistant
-                  </p>
+                  <p className="text-xs text-slate-500">POS Assistant</p>
                 </div>
               </div>
             </div>
@@ -321,8 +332,7 @@ export default function AiAssistant() {
                       </p>
 
                       <p className="mt-1 text-sm text-slate-500">
-                        Describe a sale naturally and I&apos;ll
-                        prepare it for you.
+                        Ask about products, stock, or prepare a sale naturally.
                       </p>
                     </div>
                   </div>
@@ -340,13 +350,10 @@ export default function AiAssistant() {
                       p-3
                     "
                   >
-                    <Package
-                      size={17}
-                      className="text-blue-600"
-                    />
+                    <Package size={17} className="text-blue-600" />
 
                     <p className="mt-2 text-xs font-medium text-slate-700">
-                      Find products
+                      Check stock
                     </p>
                   </div>
 
@@ -359,10 +366,7 @@ export default function AiAssistant() {
                       p-3
                     "
                   >
-                    <UserRound
-                      size={17}
-                      className="text-violet-600"
-                    />
+                    <UserRound size={17} className="text-violet-600" />
 
                     <p className="mt-2 text-xs font-medium text-slate-700">
                       Select customer
@@ -378,10 +382,7 @@ export default function AiAssistant() {
                       p-3
                     "
                   >
-                    <Banknote
-                      size={17}
-                      className="text-emerald-600"
-                    />
+                    <Banknote size={17} className="text-emerald-600" />
 
                     <p className="mt-2 text-xs font-medium text-slate-700">
                       Handle payment
@@ -397,10 +398,7 @@ export default function AiAssistant() {
                       p-3
                     "
                   >
-                    <Receipt
-                      size={17}
-                      className="text-amber-600"
-                    />
+                    <Receipt size={17} className="text-amber-600" />
 
                     <p className="mt-2 text-xs font-medium text-slate-700">
                       Prepare sale
@@ -425,37 +423,189 @@ export default function AiAssistant() {
                   className={
                     message.role === "user"
                       ? `
-                        max-w-[85%]
-                        rounded-2xl
-                        rounded-br-md
-                        bg-blue-600
-                        px-4
-                        py-3
-                        text-sm
-                        text-white
-                        shadow-sm
-                      `
+          max-w-[85%]
+          rounded-2xl
+          rounded-br-md
+          bg-blue-600
+          px-4
+          py-3
+          text-sm
+          text-white
+          shadow-sm
+        `
                       : `
-                        max-w-[90%]
-                        whitespace-pre-line
-                        rounded-2xl
-                        rounded-bl-md
-                        border
-                        border-slate-200
-                        bg-white
-                        px-4
-                        py-3
-                        text-sm
-                        leading-5
-                        text-slate-700
-                        shadow-sm
-                      `
+          max-w-[90%]
+          rounded-2xl
+          rounded-bl-md
+          border
+          border-slate-200
+          bg-white
+          px-4
+          py-3
+          text-sm
+          leading-5
+          text-slate-700
+          shadow-sm
+        `
                   }
                 >
-                  {message.text}
+                  <div className="whitespace-pre-line">{message.text}</div>
+
+                  {message.warnings && message.warnings.length > 0 && (
+                    <div className="mt-3 border-t border-red-100 pt-3 text-red-600">
+                      <div className="flex items-center gap-1.5 font-semibold">
+                        <AlertTriangle size={14} />
+                        <span>Warnings</span>
+                      </div>
+
+                      <div className="mt-1 space-y-1">
+                        {message.warnings.map((warning, warningIndex) => (
+                          <div
+                            key={warningIndex}
+                            className="text-xs leading-5 text-red-600"
+                          >
+                            • {warning}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {message.product && (
+                    <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                      <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-3 py-2.5">
+                        <Package size={15} className="text-blue-600" />
+                        <h3 className="text-xs font-bold text-slate-900">
+                          Product Information
+                        </h3>
+                      </div>
+                      <div className="p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <h3 className="truncate text-sm font-bold text-slate-900">
+                              📦 {message.product.name}
+                            </h3>
+                            <p className="mt-1 text-[10px] text-slate-400">
+                              SKU: {message.product.sku}
+                            </p>
+                          </div>
+                          <span
+                            className={
+                              !message.product.isActive
+                                ? "rounded-full bg-red-50 px-2 py-1 text-[10px] font-semibold text-red-700"
+                                : message.product.stock > 0
+                                  ? "rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700"
+                                  : "rounded-full bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-700"
+                            }
+                          >
+                            {!message.product.isActive
+                              ? "Inactive"
+                              : message.product.stock > 0
+                                ? "In stock"
+                                : "Out of stock"}
+                          </span>
+                        </div>
+                        <div className="mt-3 space-y-2">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-slate-500">Stock</span>
+                            <span className="font-semibold text-slate-900">
+                              {message.product.stock}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-slate-500">Price</span>
+                            <span className="font-semibold text-slate-900">
+                              {message.product.price.toFixed(2)} DZD
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-slate-500">Category</span>
+                            <span className="font-medium text-slate-800">
+                              {message.product.category}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-slate-500">Status</span>
+                            <span
+                              className={
+                                message.product.isActive
+                                  ? "font-semibold text-emerald-600"
+                                  : "font-semibold text-red-600"
+                              }
+                            >
+                              {message.product.isActive ? "Active" : "Inactive"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {message.products && message.products.length > 0 && (
+                    <div
+                      className={
+                        message.productListKind === "low_stock"
+                          ? "mt-3 overflow-hidden rounded-xl border border-amber-200 bg-white shadow-sm"
+                          : "mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+                      }
+                    >
+                      <div
+                        className={
+                          message.productListKind === "low_stock"
+                            ? "flex items-center gap-2 border-b border-amber-100 bg-amber-50 px-3 py-2.5"
+                            : "flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-3 py-2.5"
+                        }
+                      >
+                        {message.productListKind === "low_stock" ? (
+                          <AlertTriangle size={15} className="text-amber-600" />
+                        ) : (
+                          <Package size={15} className="text-blue-600" />
+                        )}
+                        <h3
+                          className={
+                            message.productListKind === "low_stock"
+                              ? "text-xs font-bold text-amber-800"
+                              : "text-xs font-bold text-slate-900"
+                          }
+                        >
+                          {message.productListKind === "low_stock"
+                            ? "Low Stock"
+                            : "Products"}
+                        </h3>
+                      </div>
+                      <div className="divide-y divide-slate-100">
+                        {message.products.map((product) => (
+                          <div
+                            key={product.id}
+                            className="flex items-center justify-between gap-3 px-3 py-2.5"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate text-xs font-semibold text-slate-800">
+                                {product.name}
+                              </p>
+                              <p className="mt-0.5 text-[10px] text-slate-400">
+                                {product.category} · {product.price.toFixed(2)}{" "}
+                                DZD
+                              </p>
+                            </div>
+                            <div className="shrink-0 text-right">
+                              <p className="text-xs font-bold text-slate-900">
+                                {product.stock}
+                              </p>
+                              <p className="text-[10px] text-slate-400">
+                                in stock
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
+            {/* Product cards are rendered inside each assistant message
+                so previous results remain visible in the conversation. */}
 
             {/* =================================================
                 ACTIVITY INDICATOR
@@ -480,10 +630,7 @@ export default function AiAssistant() {
                     shadow-sm
                   "
                 >
-                  <Loader2
-                    size={15}
-                    className="animate-spin text-blue-600"
-                  />
+                  <Loader2 size={15} className="animate-spin text-blue-600" />
 
                   <span>{activity}</span>
                 </div>
@@ -521,10 +668,7 @@ export default function AiAssistant() {
                   "
                 >
                   <div className="flex items-center gap-2">
-                    <Receipt
-                      size={17}
-                      className="text-blue-600"
-                    />
+                    <Receipt size={17} className="text-blue-600" />
 
                     <h3 className="text-sm font-bold text-slate-900">
                       Sale Preview
@@ -545,11 +689,7 @@ export default function AiAssistant() {
                       text-amber-700
                     "
                   >
-                    <Circle
-                      size={6}
-                      fill="currentColor"
-                    />
-
+                    <Circle size={6} fill="currentColor" />
                     Pending
                   </span>
                 </div>
@@ -567,14 +707,9 @@ export default function AiAssistant() {
                         text-sm
                       "
                     >
-                      <UserRound
-                        size={15}
-                        className="text-slate-400"
-                      />
+                      <UserRound size={15} className="text-slate-400" />
 
-                      <span className="text-slate-400">
-                        Customer
-                      </span>
+                      <span className="text-slate-400">Customer</span>
 
                       <span className="font-medium text-slate-800">
                         {preview.customerName}
@@ -593,14 +728,9 @@ export default function AiAssistant() {
                       text-sm
                     "
                   >
-                    <CreditCard
-                      size={15}
-                      className="text-slate-400"
-                    />
+                    <CreditCard size={15} className="text-slate-400" />
 
-                    <span className="text-slate-400">
-                      Payment
-                    </span>
+                    <span className="text-slate-400">Payment</span>
 
                     <span className="font-medium capitalize text-slate-800">
                       {preview.paymentMethod}
@@ -633,8 +763,7 @@ export default function AiAssistant() {
                           </div>
 
                           <div className="ml-5 mt-1 text-xs text-slate-400">
-                            {item.quantity} ×{" "}
-                            {item.unitPrice.toFixed(2)} DZD
+                            {item.quantity} × {item.unitPrice.toFixed(2)} DZD
                           </div>
 
                           {item.insufficientStock && (
@@ -651,9 +780,7 @@ export default function AiAssistant() {
                             >
                               <AlertTriangle size={12} />
 
-                              <span>
-                                Only {item.availableStock} in stock
-                              </span>
+                              <span>Only {item.availableStock} in stock</span>
                             </div>
                           )}
                         </div>
@@ -679,17 +806,13 @@ export default function AiAssistant() {
                     <div className="flex justify-between text-sm text-slate-500">
                       <span>Subtotal</span>
 
-                      <span>
-                        {preview.subtotal.toFixed(2)} DZD
-                      </span>
+                      <span>{preview.subtotal.toFixed(2)} DZD</span>
                     </div>
 
                     <div className="flex justify-between text-sm text-slate-500">
                       <span>Discount</span>
 
-                      <span>
-                        -{preview.discount.toFixed(2)} DZD
-                      </span>
+                      <span>-{preview.discount.toFixed(2)} DZD</span>
                     </div>
 
                     <div
@@ -715,9 +838,7 @@ export default function AiAssistant() {
                       <div className="flex justify-between text-xs text-slate-400">
                         <span>Change</span>
 
-                        <span>
-                          {preview.changeAmount.toFixed(2)} DZD
-                        </span>
+                        <span>{preview.changeAmount.toFixed(2)} DZD</span>
                       </div>
                     )}
                   </div>
@@ -740,14 +861,10 @@ export default function AiAssistant() {
                       text-blue-700
                     "
                   >
-                    <Check
-                      size={15}
-                      className="shrink-0"
-                    />
+                    <Check size={15} className="shrink-0" />
 
                     <span>
-                      Send <strong>confirm</strong> to complete
-                      this sale.
+                      Send <strong>confirm</strong> to complete this sale.
                     </span>
                   </div>
                 </div>
@@ -819,10 +936,7 @@ export default function AiAssistant() {
                 "
               >
                 {busy ? (
-                  <Loader2
-                    size={18}
-                    className="animate-spin"
-                  />
+                  <Loader2 size={18} className="animate-spin" />
                 ) : (
                   <Send size={18} />
                 )}
@@ -830,8 +944,7 @@ export default function AiAssistant() {
             </div>
 
             <p className="mt-2 text-center text-[10px] text-slate-400">
-              AI prepares the sale. You confirm before anything
-              is created.
+              AI prepares the sale. You confirm before anything is created.
             </p>
           </div>
         </div>

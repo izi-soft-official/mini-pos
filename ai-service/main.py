@@ -150,6 +150,8 @@ class AssistantProduct(BaseModel):
     id: int
     sku: str
     name: str
+    category: str = "Uncategorized"
+    isActive: bool = True
 
 
 class AssistantCustomer(BaseModel):
@@ -202,12 +204,33 @@ class AssistantResponse(BaseModel):
 
     message: str = ""
 
+    # ========================================================
+    # PRODUCT QUERY PARAMETERS
+    # ========================================================
+
+    productId: int | None = None
+
+    productIds: list[int] = []
+
+    queryType: str | None = None
+    operation: str | None = None
+    field: str | None = None
+    operator: str | None = None
+    value: float | None = None
+    category: str | None = None
+    status: str | None = None
+
+
+# ============================================================
+# AI ASSISTANT
+# ============================================================
 
 @app.post("/assistant", response_model=AssistantResponse)
 def assistant(request: AssistantRequest):
 
     catalog_text = "\n".join(
-        f"{p.id} | {p.name} | SKU: {p.sku}"
+        f"{p.id} | {p.name} | SKU: {p.sku} | "
+        f"Category: {p.category} | Active: {p.isActive}"
         for p in request.catalog
     )
 
@@ -245,11 +268,14 @@ You NEVER create a sale.
 
 You NEVER modify stock.
 
+You NEVER modify products.
+
 You NEVER invent product IDs.
 
 You NEVER invent customer IDs.
 
-The backend will validate everything.
+The backend will validate everything and retrieve the real
+product information from the database.
 
 ============================================================
 PRODUCT CATALOG
@@ -279,13 +305,235 @@ CURRENT USER MESSAGE
 INTENTS
 ============================================================
 
-Return exactly one of:
+Return exactly ONE of:
 
 create_sale
 modify_sale
 confirm_sale
 cancel_sale
+product_query
 unknown
+
+Do NOT create separate intents for every wording variation.
+Use product_query for read-only product and inventory questions.
+
+============================================================
+PRODUCT QUERY
+============================================================
+
+Use product_query whenever the user asks for information about
+products, inventory, prices, categories, stock, active/inactive
+status, or comparisons between products.
+
+The backend will execute the actual database query.
+
+You must understand natural language and convert it to the
+appropriate structured query parameters.
+
+Allowed queryType values:
+
+single
+search
+filter
+aggregate
+low_stock
+out_of_stock
+
+------------------------------------------------------------
+SINGLE PRODUCT
+------------------------------------------------------------
+
+Use:
+
+queryType = "single"
+
+for questions about one specific product.
+
+Examples:
+
+"How much Coca Cola do we have?"
+"How many Coca Cola are left?"
+"Do we have Pepsi?"
+"Is Pepsi in stock?"
+"Show me Coca Cola"
+"What is the stock of Milk?"
+"What is the price of Chips?"
+"Tell me about Coca Cola"
+
+Return the matching catalog ID in productId.
+
+If the product cannot be confidently matched:
+
+productId = null
+unmatched = ["human readable product name"]
+
+------------------------------------------------------------
+SEARCH / CATEGORY
+------------------------------------------------------------
+
+Use:
+
+queryType = "search"
+
+for finding products.
+
+Examples:
+
+"Find Coca Cola"
+"Show products containing Coke"
+"Find drinks"
+"Search for chips"
+"Show me snacks"
+"Which products are in the drinks category?"
+
+For a name/SKU search, return matching catalog IDs in productIds.
+
+For a category request, return the category name in category.
+Use the category exactly as it appears in the catalog when possible.
+
+Do not invent product IDs.
+
+------------------------------------------------------------
+FILTERS
+------------------------------------------------------------
+
+Use:
+
+queryType = "filter"
+
+for questions involving conditions.
+
+Examples:
+
+"Which products have less than 5 in stock?"
+"Show products with more than 20 units."
+"Which snacks have 10 units?"
+"Show inactive products."
+
+For stock conditions:
+
+field = "stock"
+operator = one of:
+">", ">=", "<", "<=", "=", "=="
+value = the numeric value
+
+For inactive products:
+
+status = "inactive"
+
+For active products:
+
+status = "active"
+
+Category can also be provided when relevant.
+
+------------------------------------------------------------
+LOW STOCK
+------------------------------------------------------------
+
+Use:
+
+queryType = "low_stock"
+
+for:
+
+"Which products are low in stock?"
+"Show low stock products"
+"What products are running low?"
+"Which products need restocking?"
+"Show me products with low inventory"
+
+The backend determines the real threshold and stock values.
+
+Do NOT invent stock values.
+
+------------------------------------------------------------
+OUT OF STOCK
+------------------------------------------------------------
+
+Use:
+
+queryType = "out_of_stock"
+
+for:
+
+"Which products are out of stock?"
+"What products are sold out?"
+"Show products with zero stock."
+
+The backend determines the real stock values.
+
+------------------------------------------------------------
+AGGREGATE / COMPARISON
+------------------------------------------------------------
+
+Use:
+
+queryType = "aggregate"
+
+for questions asking for the maximum or minimum of a product
+field.
+
+Allowed field values:
+
+price
+stock
+
+Allowed operation values:
+
+max
+min
+
+Examples:
+
+"What is the most expensive snack?"
+"Which snack costs the most?"
+"What's the priciest snack?"
+
+Return:
+
+queryType = "aggregate"
+operation = "max"
+field = "price"
+category = "Snacks"
+
+Examples:
+
+"What is the cheapest drink?"
+operation = "min"
+field = "price"
+category = "Drinks"
+
+Examples:
+
+"Which product has the most stock?"
+operation = "max"
+field = "stock"
+
+"Which product has the least stock?"
+operation = "min"
+field = "stock"
+
+Do NOT calculate the answer yourself. The backend queries the
+database.
+
+============================================================
+IMPORTANT PRODUCT QUERY RULE
+============================================================
+
+The LLM is responsible for understanding the user's wording.
+
+The ASP.NET backend is responsible for:
+
+- querying PostgreSQL
+- checking the real price
+- checking the real stock
+- checking active/inactive status
+- applying category filters
+- applying min/max operations
+- returning authoritative product data
+
+Never invent price, stock, status, category, or IDs.
 
 ============================================================
 CONFIRMATION
@@ -350,43 +598,21 @@ MODIFY SALE
 If there is already a pending sale and the user says:
 
 "make Coke 3"
-
 "Actually add another chips"
-
 "change customer to Ahmed"
-
 "make it card"
-
 "give 5 discount"
 
 then:
 
 intent = "modify_sale"
 
-IMPORTANT:
-
 For modify_sale, return the COMPLETE resulting sale items.
 
 Do NOT return only the changed item.
 
-For example:
-
-Pending:
-
-Coke x2
-Chips x1
-
-User:
-
-"make Coke 3"
-
-Return:
-
-Coke x3
-Chips x1
-
-Preserve existing customer, payment method and discount
-unless the user changes them.
+Preserve existing customer, payment method and discount unless
+the user changes them.
 
 ============================================================
 CUSTOMERS
@@ -424,9 +650,7 @@ Extract explicit discounts.
 Examples:
 
 "10 discount" -> 10
-
 "discount of 5" -> 5
-
 "give him 20 off" -> 20
 
 Do not invent a discount.
@@ -438,9 +662,7 @@ PAID AMOUNT
 If the user explicitly says:
 
 "I pay 50"
-
 "customer gives 100"
-
 "paid 200"
 
 extract the amount.
@@ -463,10 +685,107 @@ OUTPUT
 
 Return ONLY JSON.
 
-Format:
+For a single product query:
+
+{{
+  "intent": "product_query",
+  "queryType": "single",
+  "productId": 123,
+  "productIds": [],
+  "operation": null,
+  "field": null,
+  "operator": null,
+  "value": null,
+  "category": null,
+  "status": null,
+  "items": [],
+  "customerId": null,
+  "paymentMethod": null,
+  "discount": 0,
+  "paidAmount": null,
+  "unmatched": [],
+  "message": ""
+}}
+
+For "most expensive snack":
+
+{{
+  "intent": "product_query",
+  "queryType": "aggregate",
+  "productId": null,
+  "productIds": [],
+  "operation": "max",
+  "field": "price",
+  "operator": null,
+  "value": null,
+  "category": "Snacks",
+  "status": "active",
+  "items": [],
+  "customerId": null,
+  "paymentMethod": null,
+  "discount": 0,
+  "paidAmount": null,
+  "unmatched": [],
+  "message": ""
+}}
+
+For inactive products:
+
+{{
+  "intent": "product_query",
+  "queryType": "filter",
+  "productId": null,
+  "productIds": [],
+  "operation": null,
+  "field": null,
+  "operator": null,
+  "value": null,
+  "category": null,
+  "status": "inactive",
+  "items": [],
+  "customerId": null,
+  "paymentMethod": null,
+  "discount": 0,
+  "paidAmount": null,
+  "unmatched": [],
+  "message": ""
+}}
+
+For low stock:
+
+{{
+  "intent": "product_query",
+  "queryType": "low_stock",
+  "productId": null,
+  "productIds": [],
+  "operation": null,
+  "field": null,
+  "operator": null,
+  "value": null,
+  "category": null,
+  "status": "active",
+  "items": [],
+  "customerId": null,
+  "paymentMethod": null,
+  "discount": 0,
+  "paidAmount": null,
+  "unmatched": [],
+  "message": ""
+}}
+
+For sales:
 
 {{
   "intent": "create_sale",
+  "productId": null,
+  "productIds": [],
+  "queryType": null,
+  "operation": null,
+  "field": null,
+  "operator": null,
+  "value": null,
+  "category": null,
+  "status": null,
   "items": [
     {{
       "productId": 123,
@@ -493,7 +812,9 @@ Format:
                     "role": "system",
                     "content": (
                         "You are a precise POS transaction "
-                        "intent parser. Always return valid JSON."
+                        "and product information intent parser. "
+                        "Always return valid JSON. "
+                        "Never invent IDs."
                     )
                 },
                 {

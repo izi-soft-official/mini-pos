@@ -1,5 +1,6 @@
 namespace MiniPos.Api.Dtos;
 
+
 // ============================================================
 // EXISTING PARSE-SALE DTOs
 // ============================================================
@@ -9,20 +10,29 @@ public class ParseSaleRequest
     public string Text { get; set; } = string.Empty;
 }
 
+
 public class ParsedSaleItem
 {
     public int ProductId { get; set; }
+
     public string Sku { get; set; } = string.Empty;
+
     public string Name { get; set; } = string.Empty;
+
     public int Quantity { get; set; } = 1;
+
     public int AvailableStock { get; set; }
+
     public bool InsufficientStock { get; set; }
 }
+
 
 public class ParseSaleResponse
 {
     public List<ParsedSaleItem> Items { get; set; } = new();
+
     public List<string> Unmatched { get; set; } = new();
+
     public List<string> StockWarnings { get; set; } = new();
 }
 
@@ -35,6 +45,7 @@ public class AiAssistantRequest
 {
     public string Text { get; set; } = string.Empty;
 }
+
 
 public class AiAssistantResponse
 {
@@ -55,7 +66,35 @@ public class AiAssistantResponse
     public List<string> Unmatched { get; set; } = new();
 
     public List<string> Warnings { get; set; } = new();
+
+
+    // ========================================================
+    // PHASE 1 - PRODUCT / STOCK
+    // ========================================================
+
+    public AiProductInfo? Product { get; set; }
+
+    public List<AiProductInfo> Products { get; set; } = new();
 }
+
+
+public class AiProductInfo
+{
+    public int Id { get; set; }
+
+    public string Sku { get; set; } = string.Empty;
+
+    public string Name { get; set; } = string.Empty;
+
+    public string Category { get; set; } = string.Empty;
+
+    public decimal Price { get; set; }
+
+    public int Stock { get; set; }
+
+    public bool IsActive { get; set; }
+}
+
 
 public class AiSalePreview
 {
@@ -77,6 +116,7 @@ public class AiSalePreview
 
     public List<AiSalePreviewItem> Items { get; set; } = new();
 }
+
 
 public class AiSalePreviewItem
 {

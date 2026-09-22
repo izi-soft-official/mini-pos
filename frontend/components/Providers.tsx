@@ -100,7 +100,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       value={{ user, loading, login, logout, can, lang, setLang, t }}
     >
       {children}
-      <AiAssistant />
+      {user && <AiAssistant />}
     </AppContext.Provider>
   );
 }

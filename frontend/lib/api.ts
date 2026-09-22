@@ -255,6 +255,16 @@ export const settings = {
     }),
 };
 
+type AiProductInfo = {
+  id: number;
+  sku: string;
+  name: string;
+  category: string;
+  price: number;
+  stock: number;
+  isActive: boolean;
+};
+
 export const ai = {
   parseSale: (text: string) =>
     request<{
@@ -315,6 +325,10 @@ export const ai = {
       unmatched: string[];
 
       warnings: string[];
+
+      product?: AiProductInfo;
+
+      products?: AiProductInfo[];
     }>("/ai/assistant", {
       method: "POST",
       body: JSON.stringify({ text }),

@@ -186,12 +186,13 @@ public class AiController : ControllerBase
         // --------------------------------------------------------
 
         var catalog = await _db.Products
-            .Where(p => p.IsActive)
             .Select(p => new AiCatalogProduct
             {
                 Id = p.Id,
                 Sku = p.Sku,
-                Name = p.Name
+                Name = p.Name,
+                Category = p.Category != null ? p.Category.Name : "Uncategorized",
+                IsActive = p.IsActive
             })
             .ToListAsync();
 
@@ -333,6 +334,35 @@ public class AiController : ControllerBase
             return await ConfirmPendingSale(
                 userId.Value,
                 pending);
+        }
+
+        // ========================================================
+        // PRODUCT / STOCK ASSISTANT
+        // ========================================================
+
+        // Generic natural-language product questions.
+        // The Python service interprets the user's wording, while
+        // this controller performs the authoritative PostgreSQL query.
+        if (parsed.Intent == "product_query")
+        {
+            return await ProductQuery(parsed);
+        }
+
+        if (parsed.Intent == "check_product")
+        {
+            return await CheckProduct(parsed);
+        }
+
+
+        if (parsed.Intent == "low_stock")
+        {
+            return await GetLowStockProducts();
+        }
+
+
+        if (parsed.Intent == "search_products")
+        {
+            return await SearchProducts(parsed);
         }
 
 
@@ -569,7 +599,7 @@ public class AiController : ControllerBase
             PaymentMethod = paymentMethod,
             Discount = discount,
             PaidAmount = previewResult.PaidAmount,
-            Items = mergedItems
+            Items = previewResult.AdjustedItems
         };
 
         PendingSales[userId.Value] =
@@ -593,6 +623,504 @@ public class AiController : ControllerBase
             SaleCreated = false,
             Preview = previewResult.Preview,
             Warnings = previewResult.Warnings
+        });
+    }
+
+    // ============================================================
+    //  - GENERIC PRODUCT QUERY
+    // ============================================================
+
+    private async Task<ActionResult<AiAssistantResponse>>
+        ProductQuery(AiPythonResponse parsed)
+    {
+        var queryType =
+            parsed.QueryType?.Trim().ToLowerInvariant() ?? "search";
+
+        var operation =
+            parsed.Operation?.Trim().ToLowerInvariant();
+
+        var field =
+            parsed.Field?.Trim().ToLowerInvariant();
+
+        var status =
+            parsed.Status?.Trim().ToLowerInvariant();
+
+        var category =
+            parsed.Category?.Trim();
+
+        // Start from the real PostgreSQL product table.
+        // The AI service only interprets the user's wording;
+        // it does not provide prices or stock values.
+        var query = _db.Products
+            .Include(p => p.Category)
+            .AsQueryable();
+
+        // Inactive is explicitly requested.
+        // Otherwise product questions operate on active products.
+        if (status == "inactive")
+        {
+            query = query.Where(p => !p.IsActive);
+        }
+        else
+        {
+            query = query.Where(p => p.IsActive);
+        }
+
+        // Low-stock products.
+        if (queryType == "low_stock")
+        {
+            const int lowStockThreshold = 5;
+
+            var lowStock = await query
+                .Where(p => p.Stock <= lowStockThreshold)
+                .OrderBy(p => p.Stock)
+                .ThenBy(p => p.Name)
+                .Take(50)
+                .Select(p => new AiProductInfo
+                {
+                    Id = p.Id,
+                    Sku = p.Sku,
+                    Name = p.Name,
+                    Category = p.Category != null
+                        ? p.Category.Name
+                        : "Uncategorized",
+                    Price = p.Price,
+                    Stock = p.Stock,
+                    IsActive = p.IsActive
+                })
+                .ToListAsync();
+
+            return ProductListResponse(
+                lowStock,
+                lowStock.Count == 0
+                    ? "No products are currently low in stock."
+                    : $"I found {lowStock.Count} product" +
+                      $"{(lowStock.Count == 1 ? "" : "s")} with low stock.");
+        }
+
+        // Out-of-stock products.
+        if (queryType == "out_of_stock")
+        {
+            var outOfStock = await query
+                .Where(p => p.Stock <= 0)
+                .OrderBy(p => p.Name)
+                .Take(50)
+                .Select(p => new AiProductInfo
+                {
+                    Id = p.Id,
+                    Sku = p.Sku,
+                    Name = p.Name,
+                    Category = p.Category != null
+                        ? p.Category.Name
+                        : "Uncategorized",
+                    Price = p.Price,
+                    Stock = p.Stock,
+                    IsActive = p.IsActive
+                })
+                .ToListAsync();
+
+            return ProductListResponse(
+                outOfStock,
+                outOfStock.Count == 0
+                    ? "No active products are currently out of stock."
+                    : $"I found {outOfStock.Count} out-of-stock product" +
+                      $"{(outOfStock.Count == 1 ? "" : "s")}.");
+        }
+
+        // One specific product.
+        if (queryType == "single" && parsed.ProductId is not null)
+        {
+            var product = await query
+                .Where(p => p.Id == parsed.ProductId.Value)
+                .Select(p => new AiProductInfo
+                {
+                    Id = p.Id,
+                    Sku = p.Sku,
+                    Name = p.Name,
+                    Category = p.Category != null
+                        ? p.Category.Name
+                        : "Uncategorized",
+                    Price = p.Price,
+                    Stock = p.Stock,
+                    IsActive = p.IsActive
+                })
+                .FirstOrDefaultAsync();
+
+            if (product is null)
+            {
+                return Ok(new AiAssistantResponse
+                {
+                    Intent = "product_query",
+                    Message = "I couldn't find that product.",
+                    RequiresConfirmation = false,
+                    SaleCreated = false,
+                    Unmatched = parsed.Unmatched
+                });
+            }
+
+            return Ok(new AiAssistantResponse
+            {
+                Intent = "product_query",
+                Message = product.Stock > 0
+                    ? $"Yes. {product.Name} is currently in stock."
+                    : $"{product.Name} is currently out of stock.",
+                RequiresConfirmation = false,
+                SaleCreated = false,
+                Product = product
+            });
+        }
+
+        // Numeric stock filters, for example:
+        // "products with more than 10 in stock".
+        if (queryType == "filter" &&
+            field == "stock" &&
+            parsed.Value is not null)
+        {
+            var value = parsed.Value.Value;
+
+            query = parsed.Operator?.Trim() switch
+            {
+                ">" => query.Where(p => p.Stock > value),
+                ">=" => query.Where(p => p.Stock >= value),
+                "<" => query.Where(p => p.Stock < value),
+                "<=" => query.Where(p => p.Stock <= value),
+                "=" or "==" => query.Where(p => p.Stock == value),
+                _ => query.Where(p => p.Stock == value)
+            };
+        }
+
+        // Category filter, for example:
+        // "show me snacks".
+        if (!string.IsNullOrWhiteSpace(category))
+        {
+            var categoryPattern = $"%{category}%";
+
+            query = query.Where(p =>
+                p.Category != null &&
+                EF.Functions.ILike(
+                    p.Category.Name,
+                    categoryPattern));
+        }
+
+        // Product IDs can be supplied by the AI service after
+        // matching a product name from the real catalog.
+        if (parsed.ProductIds.Count > 0 &&
+            queryType == "search")
+        {
+            var ids = parsed.ProductIds
+                .Distinct()
+                .ToList();
+
+            query = query.Where(p => ids.Contains(p.Id));
+        }
+
+        // Aggregate queries such as:
+        // "most expensive snack"
+        // "cheapest product"
+        // "product with the most stock"
+        if (queryType == "aggregate")
+        {
+            query = field switch
+            {
+                "price" when operation == "max" =>
+                    query
+                        .OrderByDescending(p => p.Price)
+                        .ThenBy(p => p.Name),
+
+                "price" when operation == "min" =>
+                    query
+                        .OrderBy(p => p.Price)
+                        .ThenBy(p => p.Name),
+
+                "stock" when operation == "max" =>
+                    query
+                        .OrderByDescending(p => p.Stock)
+                        .ThenBy(p => p.Name),
+
+                "stock" when operation == "min" =>
+                    query
+                        .OrderBy(p => p.Stock)
+                        .ThenBy(p => p.Name),
+
+                _ => query.OrderBy(p => p.Name)
+            };
+        }
+        else if (queryType != "filter")
+        {
+            query = query.OrderBy(p => p.Name);
+        }
+
+        var products = await query
+            .Take(queryType == "aggregate" ? 1 : 50)
+            .Select(p => new AiProductInfo
+            {
+                Id = p.Id,
+                Sku = p.Sku,
+                Name = p.Name,
+                Category = p.Category != null
+                    ? p.Category.Name
+                    : "Uncategorized",
+                Price = p.Price,
+                Stock = p.Stock,
+                IsActive = p.IsActive
+            })
+            .ToListAsync();
+
+        if (products.Count == 0)
+        {
+            return Ok(new AiAssistantResponse
+            {
+                Intent = "product_query",
+                Message = parsed.Unmatched.Count > 0
+                    ? $"I couldn't find a product matching \"{parsed.Unmatched[0]}\"."
+                    : "I couldn't find any products matching that request.",
+                RequiresConfirmation = false,
+                SaleCreated = false,
+                Products = new List<AiProductInfo>()
+            });
+        }
+
+        var message = queryType == "aggregate"
+            ? $"I found the matching product: {products[0].Name}."
+            : $"I found {products.Count} matching product" +
+              $"{(products.Count == 1 ? "" : "s")}.";
+
+        return ProductListResponse(products, message);
+    }
+
+    private ActionResult<AiAssistantResponse> ProductListResponse(
+        List<AiProductInfo> products,
+        string message)
+    {
+        return Ok(new AiAssistantResponse
+        {
+            Intent = "product_query",
+            Message = message,
+            RequiresConfirmation = false,
+            SaleCreated = false,
+            Products = products
+        });
+    }
+
+
+    // ============================================================
+    //  - CHECK PRODUCT
+    // ============================================================
+
+    private async Task<ActionResult<AiAssistantResponse>>
+        CheckProduct(AiPythonResponse parsed)
+    {
+        if (parsed.ProductId is null)
+        {
+            return Ok(new AiAssistantResponse
+            {
+                Intent = "check_product",
+                Message =
+                    parsed.Unmatched.Count > 0
+                        ? $"I couldn't find a product matching \"{parsed.Unmatched[0]}\"."
+                        : "I couldn't identify the product you are asking about.",
+                RequiresConfirmation = false,
+                SaleCreated = false,
+                Unmatched = parsed.Unmatched
+            });
+        }
+
+
+        var product = await _db.Products
+            .Where(p =>
+                p.Id == parsed.ProductId.Value &&
+                p.IsActive)
+            .Select(p => new AiProductInfo
+            {
+                Id = p.Id,
+                Sku = p.Sku,
+                Name = p.Name,
+                Category = p.Category != null ? p.Category.Name : "Uncategorized",
+                Price = p.Price,
+                Stock = p.Stock,
+                IsActive = p.IsActive
+            })
+            .FirstOrDefaultAsync();
+
+
+        if (product is null)
+        {
+            return Ok(new AiAssistantResponse
+            {
+                Intent = "check_product",
+                Message =
+                    "I couldn't find that product in the active product catalog.",
+                RequiresConfirmation = false,
+                SaleCreated = false
+            });
+        }
+
+
+        var stockMessage =
+            product.Stock > 0
+                ? $"Yes. {product.Name} is currently in stock."
+                : $"No. {product.Name} is currently out of stock.";
+
+
+        return Ok(new AiAssistantResponse
+        {
+            Intent = "check_product",
+
+            Message = stockMessage,
+
+            RequiresConfirmation = false,
+
+            SaleCreated = false,
+
+            Product = product
+        });
+    }
+
+
+    // ============================================================
+    //  - LOW STOCK
+    // ============================================================
+
+    private async Task<ActionResult<AiAssistantResponse>>
+        GetLowStockProducts()
+    {
+        // Phase 1 low-stock threshold.
+        // Products with stock <= 5 are considered low stock.
+        const int lowStockThreshold = 5;
+
+
+        var products = await _db.Products
+            .Where(p =>
+                p.IsActive &&
+                p.Stock <= lowStockThreshold)
+            .OrderBy(p => p.Stock)
+            .ThenBy(p => p.Name)
+            .Select(p => new AiProductInfo
+            {
+                Id = p.Id,
+                Sku = p.Sku,
+                Name = p.Name,
+                Category = p.Category != null ? p.Category.Name : "Uncategorized",
+                Price = p.Price,
+                Stock = p.Stock,
+                IsActive = p.IsActive
+            })
+            .ToListAsync();
+
+
+        if (products.Count == 0)
+        {
+            return Ok(new AiAssistantResponse
+            {
+                Intent = "low_stock",
+
+                Message =
+                    "No products are currently low in stock.",
+
+                RequiresConfirmation = false,
+
+                SaleCreated = false,
+
+                Products = new List<AiProductInfo>()
+            });
+        }
+
+
+        return Ok(new AiAssistantResponse
+        {
+            Intent = "low_stock",
+
+            Message =
+                $"I found {products.Count} product" +
+                $"{(products.Count == 1 ? "" : "s")} with low stock.",
+
+            RequiresConfirmation = false,
+
+            SaleCreated = false,
+
+            Products = products
+        });
+    }
+
+
+    // ============================================================
+    // SEARCH PRODUCTS
+    // ============================================================
+
+    private async Task<ActionResult<AiAssistantResponse>>
+        SearchProducts(AiPythonResponse parsed)
+    {
+        var requestedIds = parsed.ProductIds
+            .Distinct()
+            .ToList();
+
+
+        if (requestedIds.Count == 0)
+        {
+            return Ok(new AiAssistantResponse
+            {
+                Intent = "search_products",
+
+                Message =
+                    parsed.Unmatched.Count > 0
+                        ? $"I couldn't find a product matching \"{parsed.Unmatched[0]}\"."
+                        : "I couldn't identify the product you are looking for.",
+
+                RequiresConfirmation = false,
+
+                SaleCreated = false,
+
+                Unmatched = parsed.Unmatched
+            });
+        }
+
+
+        var products = await _db.Products
+            .Where(p =>
+                requestedIds.Contains(p.Id) &&
+                p.IsActive)
+                .Select(p => new AiProductInfo
+                {
+                    Id = p.Id,
+                    Sku = p.Sku,
+                    Name = p.Name,
+                    Category = p.Category != null ? p.Category.Name : "Uncategorized",
+                    Price = p.Price,
+                    Stock = p.Stock,
+                    IsActive = p.IsActive
+                })
+            .ToListAsync();
+
+
+        if (products.Count == 0)
+        {
+            return Ok(new AiAssistantResponse
+            {
+                Intent = "search_products",
+
+                Message =
+                    "I couldn't find any matching active products.",
+
+                RequiresConfirmation = false,
+
+                SaleCreated = false
+            });
+        }
+
+
+        return Ok(new AiAssistantResponse
+        {
+            Intent = "search_products",
+
+            Message =
+                $"I found {products.Count} matching product" +
+                $"{(products.Count == 1 ? "" : "s")}.",
+
+            RequiresConfirmation = false,
+
+            SaleCreated = false,
+
+            Products = products
         });
     }
 
@@ -648,6 +1176,9 @@ public class AiController : ControllerBase
 
         decimal subtotal = 0;
 
+        var warnings = new List<string>();
+        var adjustedItems = new List<PendingSaleItem>();
+
         foreach (var item in items)
         {
             if (!products.TryGetValue(
@@ -670,8 +1201,43 @@ public class AiController : ControllerBase
                     $"Quantity for {product.Name} must be greater than zero.");
             }
 
+            // Quantity originally requested by the cashier/AI.
+            var requestedQuantity = item.Quantity;
+
+            // Quantity that can actually be sold.
+            var adjustedQuantity = Math.Min(
+                requestedQuantity,
+                product.Stock);
+
+            // No stock available: warn and do not include this item
+            // in the pending sale.
+            if (adjustedQuantity <= 0)
+            {
+                warnings.Add(
+                    $"{product.Name}: requested {requestedQuantity}, " +
+                    "but there is no stock available.");
+
+                continue;
+            }
+
+            // Requested quantity is greater than available stock.
+            if (requestedQuantity > product.Stock)
+            {
+                warnings.Add(
+                    $"{product.Name}: requested {requestedQuantity}, " +
+                    $"only {product.Stock} in stock.");
+            }
+
+            // IMPORTANT: save the adjusted quantity in the pending sale.
+            adjustedItems.Add(
+                new PendingSaleItem
+                {
+                    ProductId = product.Id,
+                    Quantity = adjustedQuantity
+                });
+
             var lineTotal =
-                product.Price * item.Quantity;
+                product.Price * adjustedQuantity;
 
             subtotal += lineTotal;
 
@@ -681,15 +1247,14 @@ public class AiController : ControllerBase
                     ProductId = product.Id,
                     Sku = product.Sku,
                     Name = product.Name,
-                    Quantity = item.Quantity,
+                    Quantity = adjustedQuantity,
                     UnitPrice = product.Price,
                     LineTotal = lineTotal,
                     AvailableStock = product.Stock,
                     InsufficientStock =
-                        item.Quantity > product.Stock
+                        requestedQuantity > product.Stock
                 });
         }
-
 
         if (discount < 0)
             discount = 0;
@@ -704,22 +1269,6 @@ public class AiController : ControllerBase
         var total =
             subtotal - discount;
 
-
-        // --------------------------------------------------------
-        // STOCK WARNINGS
-        // --------------------------------------------------------
-
-        var warnings = new List<string>();
-
-        foreach (var item in preview.Items)
-        {
-            if (item.InsufficientStock)
-            {
-                warnings.Add(
-                    $"{item.Name}: requested {item.Quantity}, " +
-                    $"only {item.AvailableStock} in stock.");
-            }
-        }
 
 
         // --------------------------------------------------------
@@ -759,7 +1308,9 @@ public class AiController : ControllerBase
             Success = true,
             Preview = preview,
             Warnings = warnings,
-            PaidAmount = finalPaidAmount
+            PaidAmount = finalPaidAmount,
+            AdjustedItems = adjustedItems
+
         };
     }
 
@@ -856,10 +1407,10 @@ public class AiController : ControllerBase
                             ExtractError(objectResult.Value)
                         }
                     })
-                    {
-                        StatusCode =
+                {
+                    StatusCode =
                             objectResult.StatusCode
-                    });
+                });
         }
 
 
@@ -1045,6 +1596,25 @@ public class AiController : ControllerBase
         public List<string> Unmatched { get; set; } = new();
 
         public string Message { get; set; } = string.Empty;
+
+        public int? ProductId { get; set; }
+
+        public List<int> ProductIds { get; set; } = new();
+
+        // Generic product-query fields returned by the Python AI service.
+        public string? QueryType { get; set; }
+
+        public string? Operation { get; set; }
+
+        public string? Field { get; set; }
+
+        public string? Operator { get; set; }
+
+        public decimal? Value { get; set; }
+
+        public string? Category { get; set; }
+
+        public string? Status { get; set; }
     }
 
 
@@ -1063,6 +1633,10 @@ public class AiController : ControllerBase
         public string Sku { get; set; } = string.Empty;
 
         public string Name { get; set; } = string.Empty;
+
+        public string Category { get; set; } = "Uncategorized";
+
+        public bool IsActive { get; set; }
     }
 
 
@@ -1107,6 +1681,8 @@ public class AiController : ControllerBase
         public List<string> Warnings { get; set; } = new();
 
         public decimal PaidAmount { get; set; }
+
+        public List<PendingSaleItem> AdjustedItems { get; set; } = new();
 
         public static PreviewBuildResult Fail(
             string error)
